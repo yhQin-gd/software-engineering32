@@ -38,3 +38,20 @@ func JWTAuthMiddleware() gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// if err != nil {
+// 	// 可以根据不同的错误类型给出不同的响应
+// 	if ve, ok := err.(*jwt.ValidationError); ok {
+// 		if ve.Errors&jwt.ValidationErrorMalformed != 0 {
+// 			c.JSON(http.StatusBadRequest, gin.H{"message": "Token 格式错误"})
+// 		} else if ve.Errors&(jwt.ValidationErrorExpired|jwt.ValidationErrorNotValidYet) != 0 {
+// 			c.JSON(http.StatusUnauthorized, gin.H{"message": "Token 已过期或未激活"})
+// 		} else {
+// 			c.JSON(http.StatusUnauthorized, gin.H{"message": "无法处理 Token"})
+// 		}
+// 	} else {
+// 		c.JSON(http.StatusUnauthorized, gin.H{"message": "Token 无效"})
+// 	}
+// 	c.Abort()
+// 	return
+// }
