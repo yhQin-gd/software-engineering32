@@ -14,7 +14,30 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// 接收数据
+
+// RequestData 用于接收系统监控数据的请求体
+// @Description RequestData 包含所有需要收集的系统信息
+type RequestData struct {
+	CPUInfo  []model.CPUInfo     `json:"cpu_info"`  // CPU 信息
+	HostInfo model.HostInfo      `json:"host_info"` // 主机信息
+	MemInfo  model.MemoryInfo    `json:"mem_info"`  // 内存信息
+	ProInfo  []model.ProcessInfo `json:"pro_info"`  // 进程信息
+	NetInfo  model.NetworkInfo   `json:"net_info"`  // 网络信息
+}
+
+// GetMessage 接收并处理系统监控数据
+//
+// @Summary 接收系统监控信息（CPU、内存、主机信息等）
+// @Description 该API用于接收客户端发送的系统监控数据，并验证token和JWT后将数据存储到数据库中。
+// @Tags Monitor
+// @Accept json
+// @Produce json
+// @Param request body RequestData true "请求体包含系统监控数据"
+// @Success 201 {object} map[string]string "成功响应"
+// @Failure 400 {object} map[string]string "无效的JSON数据或令牌长度错误"
+// @Failure 401 {object} map[string]string "授权头缺失或无效的token格式或无效的JWT token"
+// @Failure 500 {object} map[string]string "数据库操作失败"
+// @Router /monitor [post]
 func GetMessage(c *gin.Context) {
 	// 初始化数据库
 	db, err := model.InitDB()
@@ -26,13 +49,7 @@ func GetMessage(c *gin.Context) {
 	defer db.Close()
 
 	// 解析请求数据
-	var requestData struct {
-		CPUInfo  []model.CPUInfo     `json:"cpu_info"`
-		HostInfo model.HostInfo      `json:"host_info"`
-		MemInfo  model.MemoryInfo    `json:"mem_info"`
-		ProInfo  []model.ProcessInfo `json:"pro_info"`
-		NetInfo  model.NetworkInfo   `json:"net_info"`
-	}
+	var requestData RequestData
 	if err := c.ShouldBindJSON(&requestData); err != nil {
 		s := fmt.Sprintf("Invalid JSON data: %s", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": s})

@@ -1,6 +1,7 @@
 package model
 
 import (
+	"cmd/server/config"
 	"database/sql"
 	"fmt"
 	"log"
@@ -10,137 +11,151 @@ import (
 	_ "github.com/lib/pq"
 )
 
+type RequestData struct {
+	CPUInfo  []CPUInfo     `json:"cpu_info"`
+	HostInfo HostInfo      `json:"host_info"`
+	MemInfo  MemoryInfo    `json:"mem_info"`
+	ProInfo  []ProcessInfo `json:"pro_info"`
+	NetInfo  NetworkInfo   `json:"net_info"`
+}
+
 type Claims struct {
 	Username string `json:"username"`
 	jwt.StandardClaims
 }
 
 // 连接数据库并创建表
-func InitDB() (*sql.DB, error) {
-	connStr := "host=192.168.31.251 port=5432 user=postgres password=cCyjKKMyweCer8f3 dbname=monitor sslmode=disable"
+func InitDB() (*sql.DB, error) { // 
+	// connStr := "host=192.168.31.251 port=5432 user=postgres password=cCyjKKMyweCer8f3 dbname=monitor sslmode=disable"
+	config, _ := config.LoadConfig()
+	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		config.DB.Host,
+		config.DB.Port,
+		config.DB.User,
+		config.DB.Password,
+		config.DB.Name,
+	)
+	
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		return nil, err
 	}
-	// cpu表
-	createCPUSQL := `
-	ALTER TABLE hostandtoken
-ADD COLUMN last_heartbeat TIMESTAMP DEFAULT NOW(),
-ADD COLUMN status VARCHAR(10) DEFAULT 'offline';
 
-	CREATE TABLE IF NOT EXISTS cpu_info (
-		id SERIAL PRIMARY KEY,
-		host_id INT REFERENCES host_info(id),
-		model_name TEXT NOT NULL,
-		cores_num INT NOT NULL,
-		percent FLOAT NOT NULL,
-		cpu_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-	);
+// 	// cpu表
+// 	createCPUSQL := `
+// 	CREATE TABLE IF NOT EXISTS cpu_info (
+// 		id SERIAL PRIMARY KEY,
+// 		host_id INT REFERENCES host_info(id),
+// 		model_name TEXT NOT NULL,
+// 		cores_num INT NOT NULL,
+// 		percent FLOAT NOT NULL,
+// 		cpu_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+// 	);
 	
-`
-	// memory表
-	createMEMSQL := `
-	CREATE TABLE IF NOT EXISTS memory_info (
-		id SERIAL PRIMARY KEY,
-		host_id INT REFERENCES host_info(id),
-		total TEXT NOT NULL,
-		available TEXT NOT NULL,
-		used TEXT NOT NULL,
-		free TEXT NOT NULL,
-		user_percent TEXT NOT NULL,
-		mem_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-	);
+// `
+// 	// memory表
+// 	createMEMSQL := `
+// 	CREATE TABLE IF NOT EXISTS memory_info (
+// 		id SERIAL PRIMARY KEY,
+// 		host_id INT REFERENCES host_info(id),
+// 		total TEXT NOT NULL,
+// 		available TEXT NOT NULL,
+// 		used TEXT NOT NULL,
+// 		free TEXT NOT NULL,
+// 		user_percent TEXT NOT NULL,
+// 		mem_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+// 	);
 	
-`
-	// host表
-	createHOSTSQL := `
-	CREATE TABLE IF NOT EXISTS host_info (
-		id SERIAL PRIMARY KEY,
-		hostname TEXT  UNIQUE,
-		os TEXT NOT NULL,
-		platform TEXT NOT NULL,
-		kernel_arch TEXT NOT NULL,
-		host_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-	);`
-	// process表
-	createPROSQL := `
-	CREATE TABLE IF NOT EXISTS process_info (
-		id SERIAL PRIMARY KEY,
-		host_id INT REFERENCES host_info(id),
-		pid INT NOT NULL,
-		cpu_percent FLOAT NOT NULL,
-		mem_percent FLOAT NOT NULL,
-		cmdline TEXT NOT NULL,
-		pro_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-	);
+// `
+// 	// host表
+// 	createHOSTSQL := `
+// 	CREATE TABLE IF NOT EXISTS host_info (
+// 		id SERIAL PRIMARY KEY,
+// 		hostname TEXT  UNIQUE,
+// 		os TEXT NOT NULL,
+// 		platform TEXT NOT NULL,
+// 		kernel_arch TEXT NOT NULL,
+// 		host_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+// 	);`
+// 	// process表
+// 	createPROSQL := `
+// 	CREATE TABLE IF NOT EXISTS process_info (
+// 		id SERIAL PRIMARY KEY,
+// 		host_id INT REFERENCES host_info(id),
+// 		pid INT NOT NULL,
+// 		cpu_percent FLOAT NOT NULL,
+// 		mem_percent FLOAT NOT NULL,
+// 		cmdline TEXT NOT NULL,
+// 		pro_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+// 	);
 	
-`
-	// net_info表
-	createNetSQL := `
-	CREATE TABLE IF NOT EXISTS network_info (
-		id SERIAL PRIMARY KEY,
-		host_id INT REFERENCES host_info(id),
-		bytesrecv INT NOT NULL,
-		bytessent INT NOT NULL,
-		net_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-	);`
+// `	
+// 	// net_info表
+// 	createNetSQL := `
+// 	CREATE TABLE IF NOT EXISTS network_info (
+// 		id SERIAL PRIMARY KEY,
+// 		host_id INT REFERENCES host_info(id),
+// 		bytesrecv INT NOT NULL,
+// 		bytessent INT NOT NULL,
+// 		net_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+// 	);`
 
-	// system_info表
-	createTableSQL := `
-	ALTER TABLE system_info
-ADD COLUMN network_info_id INT REFERENCES network_info(id);
-	CREATE TABLE IF NOT EXISTS system_info (
-		id SERIAL PRIMARY KEY,
-		cpu_info_id INT REFERENCES cpu_info(id),
-		memory_info_id INT REFERENCES memory_info(id),
-		host_info_id INT REFERENCES host_info(id),
-		process_info_id INT REFERENCES process_info(id),
-		system_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-	);`
+// 	// system_info表
+// 	createTableSQL := `
+// 	ALTER TABLE system_info
+// ADD COLUMN network_info_id INT REFERENCES network_info(id);
+// 	CREATE TABLE IF NOT EXISTS system_info (
+// 		id SERIAL PRIMARY KEY,
+// 		cpu_info_id INT REFERENCES cpu_info(id),
+// 		memory_info_id INT REFERENCES memory_info(id),
+// 		host_info_id INT REFERENCES host_info(id),
+// 		process_info_id INT REFERENCES process_info(id),
+// 		system_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+// 	);`
 
-	//token表
-	createTokenSQL := `
-	CREATE TABLE IF NOT EXISTS hostandtoken (
-		id SERIAL PRIMARY KEY,
-		host_name TEXT NOT NULL,
-		token TEXT NOT NULL
-	);`
+// 	//token表
+// 	createTokenSQL := `
+// 	CREATE TABLE IF NOT EXISTS hostandtoken (
+// 		id SERIAL PRIMARY KEY,
+// 		host_name TEXT NOT NULL,
+// 		token TEXT NOT NULL
+// 	);`
 
-	_, err = db.Exec(createCPUSQL)
-	if err != nil {
-		fmt.Printf("failed to create cpu_info table: %v", err)
-		return nil, err
-	}
-	_, err = db.Exec(createMEMSQL)
-	if err != nil {
-		fmt.Printf("failed to create memory_info table: %v", err)
-		return nil, err
-	}
-	_, err = db.Exec(createHOSTSQL)
-	if err != nil {
-		fmt.Printf("failed to create host_info table: %v", err)
-		return nil, err
-	}
-	_, err = db.Exec(createPROSQL)
-	if err != nil {
-		fmt.Printf("failed to create process_info table: %v", err)
-		return nil, err
-	}
-	_, err = db.Exec(createNetSQL)
-	if err != nil {
-		fmt.Printf("failed to create net_info table: %v", err)
-		return nil, err
-	}
-	_, err = db.Exec(createTableSQL)
-	if err != nil {
-		fmt.Printf("failed to create system_info table: %v", err)
-		return nil, err
-	}
-	_, err = db.Exec(createTokenSQL)
-	if err != nil {
-		fmt.Printf("failed to create hostandtoken table: %v", err)
-		return nil, err
-	}
+// 	_, err = db.Exec(createCPUSQL)
+// 	if err != nil {
+// 		fmt.Printf("failed to create cpu_info table: %v", err)
+// 		return nil, err
+// 	}
+// 	_, err = db.Exec(createMEMSQL)
+// 	if err != nil {
+// 		fmt.Printf("failed to create memory_info table: %v", err)
+// 		return nil, err
+// 	}
+// 	_, err = db.Exec(createHOSTSQL)
+// 	if err != nil {
+// 		fmt.Printf("failed to create host_info table: %v", err)
+// 		return nil, err
+// 	}
+// 	_, err = db.Exec(createPROSQL)
+// 	if err != nil {
+// 		fmt.Printf("failed to create process_info table: %v", err)
+// 		return nil, err
+// 	}
+// 	_, err = db.Exec(createNetSQL)
+// 	if err != nil {
+// 		fmt.Printf("failed to create net_info table: %v", err)
+// 		return nil, err
+// 	}
+// 	_, err = db.Exec(createTableSQL)
+// 	if err != nil {
+// 		fmt.Printf("failed to create system_info table: %v", err)
+// 		return nil, err
+// 	}
+// 	_, err = db.Exec(createTokenSQL)
+// 	if err != nil {
+// 		fmt.Printf("failed to create hostandtoken table: %v", err)
+// 		return nil, err
+// 	}
 	return db, nil
 }
 
