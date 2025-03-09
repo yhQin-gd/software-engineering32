@@ -3,6 +3,7 @@ package model
 import (
 	"cmd/server/config"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -10,6 +11,26 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	_ "github.com/lib/pq"
 )
+
+// 连接数据库并创建表
+func InitDB() (*sql.DB, error) { //
+	// connStr := "host=192.168.31.251 port=5432 user=postgres password=cCyjKKMyweCer8f3 dbname=monitor sslmode=disable"
+	config, _ := config.LoadConfig()
+	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		config.DB.Host,
+		config.DB.Port,
+		config.DB.User,
+		config.DB.Password,
+		config.DB.Name,
+	)
+
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		return nil, err
+	}
+
+	return db, nil
+}
 
 type RequestData struct {
 	CPUInfo  []CPUInfo     `json:"cpu_info"`
@@ -24,141 +45,6 @@ type Claims struct {
 	jwt.StandardClaims
 }
 
-// 连接数据库并创建表
-func InitDB() (*sql.DB, error) { // 
-	// connStr := "host=192.168.31.251 port=5432 user=postgres password=cCyjKKMyweCer8f3 dbname=monitor sslmode=disable"
-	config, _ := config.LoadConfig()
-	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		config.DB.Host,
-		config.DB.Port,
-		config.DB.User,
-		config.DB.Password,
-		config.DB.Name,
-	)
-	
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		return nil, err
-	}
-
-// 	// cpu表
-// 	createCPUSQL := `
-// 	CREATE TABLE IF NOT EXISTS cpu_info (
-// 		id SERIAL PRIMARY KEY,
-// 		host_id INT REFERENCES host_info(id),
-// 		model_name TEXT NOT NULL,
-// 		cores_num INT NOT NULL,
-// 		percent FLOAT NOT NULL,
-// 		cpu_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-// 	);
-	
-// `
-// 	// memory表
-// 	createMEMSQL := `
-// 	CREATE TABLE IF NOT EXISTS memory_info (
-// 		id SERIAL PRIMARY KEY,
-// 		host_id INT REFERENCES host_info(id),
-// 		total TEXT NOT NULL,
-// 		available TEXT NOT NULL,
-// 		used TEXT NOT NULL,
-// 		free TEXT NOT NULL,
-// 		user_percent TEXT NOT NULL,
-// 		mem_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-// 	);
-	
-// `
-// 	// host表
-// 	createHOSTSQL := `
-// 	CREATE TABLE IF NOT EXISTS host_info (
-// 		id SERIAL PRIMARY KEY,
-// 		hostname TEXT  UNIQUE,
-// 		os TEXT NOT NULL,
-// 		platform TEXT NOT NULL,
-// 		kernel_arch TEXT NOT NULL,
-// 		host_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-// 	);`
-// 	// process表
-// 	createPROSQL := `
-// 	CREATE TABLE IF NOT EXISTS process_info (
-// 		id SERIAL PRIMARY KEY,
-// 		host_id INT REFERENCES host_info(id),
-// 		pid INT NOT NULL,
-// 		cpu_percent FLOAT NOT NULL,
-// 		mem_percent FLOAT NOT NULL,
-// 		cmdline TEXT NOT NULL,
-// 		pro_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-// 	);
-	
-// `	
-// 	// net_info表
-// 	createNetSQL := `
-// 	CREATE TABLE IF NOT EXISTS network_info (
-// 		id SERIAL PRIMARY KEY,
-// 		host_id INT REFERENCES host_info(id),
-// 		bytesrecv INT NOT NULL,
-// 		bytessent INT NOT NULL,
-// 		net_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-// 	);`
-
-// 	// system_info表
-// 	createTableSQL := `
-// 	ALTER TABLE system_info
-// ADD COLUMN network_info_id INT REFERENCES network_info(id);
-// 	CREATE TABLE IF NOT EXISTS system_info (
-// 		id SERIAL PRIMARY KEY,
-// 		cpu_info_id INT REFERENCES cpu_info(id),
-// 		memory_info_id INT REFERENCES memory_info(id),
-// 		host_info_id INT REFERENCES host_info(id),
-// 		process_info_id INT REFERENCES process_info(id),
-// 		system_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-// 	);`
-
-// 	//token表
-// 	createTokenSQL := `
-// 	CREATE TABLE IF NOT EXISTS hostandtoken (
-// 		id SERIAL PRIMARY KEY,
-// 		host_name TEXT NOT NULL,
-// 		token TEXT NOT NULL
-// 	);`
-
-// 	_, err = db.Exec(createCPUSQL)
-// 	if err != nil {
-// 		fmt.Printf("failed to create cpu_info table: %v", err)
-// 		return nil, err
-// 	}
-// 	_, err = db.Exec(createMEMSQL)
-// 	if err != nil {
-// 		fmt.Printf("failed to create memory_info table: %v", err)
-// 		return nil, err
-// 	}
-// 	_, err = db.Exec(createHOSTSQL)
-// 	if err != nil {
-// 		fmt.Printf("failed to create host_info table: %v", err)
-// 		return nil, err
-// 	}
-// 	_, err = db.Exec(createPROSQL)
-// 	if err != nil {
-// 		fmt.Printf("failed to create process_info table: %v", err)
-// 		return nil, err
-// 	}
-// 	_, err = db.Exec(createNetSQL)
-// 	if err != nil {
-// 		fmt.Printf("failed to create net_info table: %v", err)
-// 		return nil, err
-// 	}
-// 	_, err = db.Exec(createTableSQL)
-// 	if err != nil {
-// 		fmt.Printf("failed to create system_info table: %v", err)
-// 		return nil, err
-// 	}
-// 	_, err = db.Exec(createTokenSQL)
-// 	if err != nil {
-// 		fmt.Printf("failed to create hostandtoken table: %v", err)
-// 		return nil, err
-// 	}
-	return db, nil
-}
-
 type HostInfo struct {
 	ID         int       `json:"id"` // 添加 ID 字段
 	Hostname   string    `json:"hostname"`
@@ -169,7 +55,63 @@ type HostInfo struct {
 	Token      string    `json:"token"`
 }
 
-func InsertHostInfo(db *sql.DB, hostInfo HostInfo, username string) (int, string, error) {
+type CPUInfo struct {
+	ID        int       `json:"id"` // 添加 ID 字段
+	ModelName string    `json:"model_name"`
+	CoresNum  int       `json:"cores_num"`
+	Percent   float64   `json:"percent"`
+	CreatedAt time.Time `json:"cpu_info_created_at"` // 添加 CreatedAt 字段
+}
+
+type ProcessInfo struct {
+	ID         int       `json:"id"` // 添加 ID 字段
+	PID        int       `json:"pid"`
+	CPUPercent float64   `json:"cpu_percent"`
+	MemPercent float64   `json:"mem_percent"`
+	Cmdline    string    `json:"cmdline"`
+	CreatedAt  time.Time `json:"pro_info_created_at"` // 添加 CreatedAt 字段
+}
+
+type MemoryInfo struct {
+	ID          int       `json:"id"` // 添加 ID 字段
+	Total       string    `json:"total"`
+	Available   string    `json:"available"`
+	Used        string    `json:"used"`
+	Free        string    `json:"free"`
+	UserPercent float64   `json:"user_percent"`
+	CreatedAt   time.Time `json:"mem_info_created_at"` // 添加 CreatedAt 字段
+}
+
+// 定义网络信息结构体
+type NetworkInfo struct {
+	ID        int       `json:"id"`
+	Name      string    `json:"name"`
+	BytesRecv uint64    `json:"bytes_recv"` // 接收字节数
+	BytesSent uint64    `json:"bytes_sent"` // 发送字节数
+	CreatedAt time.Time `json:"net_info_created_at"`
+}
+
+type CPUData struct {
+	Time string  `json:"time"`
+	Data CPUInfo `json:"data"`
+}
+
+type MemoryData struct {
+	Time string     `json:"time"`
+	Data MemoryInfo `json:"data"`
+}
+
+type ProcessData struct {
+	Time string      `json:"time"`
+	Data ProcessInfo `json:"data"`
+}
+
+type NetworkData struct {
+	Time string      `json:"time"`
+	Data NetworkInfo `json:"data"`
+}
+
+func InsertHostInfo(db *sql.DB, hostInfo HostInfo, username string) (error) {
 	var hostInfoID int
 	var hostname string
 	var exists bool
@@ -185,7 +127,7 @@ func InsertHostInfo(db *sql.DB, hostInfo HostInfo, username string) (int, string
 		exists = false
 	} else if err != nil {
 		fmt.Printf("Failed to query host info: %v\n", err)
-		return 0, "", err
+		return  err
 	}
 
 	if exists {
@@ -197,7 +139,7 @@ func InsertHostInfo(db *sql.DB, hostInfo HostInfo, username string) (int, string
 		_, err = db.Exec(updateSQL, hostInfoID)
 		if err != nil {
 			fmt.Printf("Failed to update host_info_created_at: %v\n", err)
-			return 0, "", err
+			return err
 		}
 		fmt.Printf("Updated existing host_info with ID: %d\n", hostInfoID)
 	} else {
@@ -209,152 +151,133 @@ func InsertHostInfo(db *sql.DB, hostInfo HostInfo, username string) (int, string
 		err = db.QueryRow(insertSQL, hostInfo.Hostname, hostInfo.OS, hostInfo.Platform, hostInfo.KernelArch, username).Scan(&hostInfoID, &hostname)
 		if err != nil {
 			fmt.Printf("Failed to insert host_info: %v\n", err)
-			return 0, "", err
+			return err
 		}
 		fmt.Printf("Inserted new host_info with ID and Name: %d and %v\n", hostInfoID, hostname)
 	}
 
-	return hostInfoID, hostname, nil
+	return nil
 }
 
-type CPUInfo struct {
-	ID        int       `json:"id"` // 添加 ID 字段
-	ModelName string    `json:"model_name"`
-	CoresNum  int       `json:"cores_num"`
-	Percent   float64   `json:"percent"`
-	CreatedAt time.Time `json:"cpu_info_created_at"` // 添加 CreatedAt 字段
-}
+func InsertSystemInfo(db *sql.DB, hostInfoID int, cpuInfo CPUInfo, memoryInfo MemoryInfo, processInfo ProcessInfo, networkInfo NetworkInfo) error {
+	// 检查是否已经存在对应的 system_info 记录
+	var existingID int
+	var cpuInfoJSON, memoryInfoJSON, processInfoJSON, networkInfoJSON []byte
 
-func InsertCpuInfo(db *sql.DB, cpuInfo CPUInfo, hostInfoID int, hostname string) (int, error) {
-	cpuSQL := ` 
-    INSERT INTO cpu_info (model_name, cores_num, percent, host_id, hostname, cpu_info_created_at)
-    VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
-    RETURNING id`
-	var cpuInfoID int
-	err := db.QueryRow(cpuSQL, cpuInfo.ModelName, cpuInfo.CoresNum, cpuInfo.Percent, hostInfoID, hostname).Scan(&cpuInfoID)
-	if err != nil {
-		return 0, fmt.Errorf("failed to insert CPU info: %v", err)
-	}
-	fmt.Printf("Inserted cpu_info with ID: %d\n", cpuInfoID)
-	return cpuInfoID, nil
-}
+	// 查询是否存在
+	querySQL := `
+	SELECT id, cpu_info, memory_info, process_info, network_info
+	FROM system_info
+	WHERE host_info_id = $1
+	ORDER BY created_at DESC LIMIT 1`
 
-type ProcessInfo struct {
-	ID         int       `json:"id"` // 添加 ID 字段
-	PID        int       `json:"pid"`
-	CPUPercent float64   `json:"cpu_percent"`
-	MemPercent float64   `json:"mem_percent"`
-	Cmdline    string    `json:"cmdline"`
-	CreatedAt  time.Time `json:"pro_info_created_at"` // 添加 CreatedAt 字段
-}
-
-func InsertProcessInfo(db *sql.DB, processInfo ProcessInfo, hostInfoID int, hostname string) (int, error) {
-	processSQL := ` 
-    INSERT INTO process_info (pid, cpu_percent, mem_percent, cmdline, host_id, hostname, pro_info_created_at)
-    VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
-    RETURNING id`
-	var processInfoID int
-	err := db.QueryRow(processSQL, processInfo.PID, processInfo.CPUPercent, processInfo.MemPercent, processInfo.Cmdline, hostInfoID, hostname).Scan(&processInfoID)
-	if err != nil {
-		return 0, fmt.Errorf("failed to insert process info: %v", err)
-	}
-	fmt.Printf("Inserted process_info with ID: %d\n", processInfoID)
-	return processInfoID, nil
-}
-
-type MemoryInfo struct {
-	ID          int       `json:"id"` // 添加 ID 字段
-	Total       string    `json:"total"`
-	Available   string    `json:"available"`
-	Used        string    `json:"used"`
-	Free        string    `json:"free"`
-	UserPercent float64   `json:"user_percent"`
-	CreatedAt   time.Time `json:"mem_info_created_at"` // 添加 CreatedAt 字段
-}
-
-func InsertMemoryInfo(db *sql.DB, memoryInfo MemoryInfo, hostInfoID int, hostname string) (int, error) {
-	memSQL := `
-    INSERT INTO memory_info (total, available, used, free, user_percent, host_id, hostname, mem_info_created_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
-    RETURNING id`
-	var memoryInfoID int
-	err := db.QueryRow(memSQL, memoryInfo.Total, memoryInfo.Available, memoryInfo.Used, memoryInfo.Free, memoryInfo.UserPercent, hostInfoID, hostname).Scan(&memoryInfoID)
-	if err != nil {
-		return 0, fmt.Errorf("failed to insert memory info: %v", err)
-	}
-	fmt.Printf("Inserted memory_info with ID: %d\n", memoryInfoID)
-	return memoryInfoID, nil
-}
-
-// 定义网络信息结构体
-type NetworkInfo struct {
-	ID        int       `json:"id"`
-	Name      string    `json:"name"`
-	BytesRecv uint64    `json:"bytes_recv"` // 接收字节数
-	BytesSent uint64    `json:"bytes_sent"` // 发送字节数
-	CreatedAt time.Time `json:"net_info_created_at"`
-}
-
-func InsertNetworkInfo(db *sql.DB, networkInfo NetworkInfo, hostInfoID int, hostname string) (int, error) {
-	netSQL := `
-    INSERT INTO network_info (name, bytesrecv, bytessent, net_info_created_at)
-    VALUES ($1, $2,$3, CURRENT_TIMESTAMP)
-    RETURNING id`
-	var netInfoID int
-	err := db.QueryRow(netSQL, networkInfo.Name, networkInfo.BytesRecv, networkInfo.BytesSent, hostInfoID, hostname).Scan(&netInfoID)
-	if err != nil {
-		return 0, fmt.Errorf("failed to insert memory info: %v", err)
-	}
-	log.Printf("Inserted net_info with ID: %d\n", netInfoID)
-	return netInfoID, nil
-}
-func InsertSystemInfo(db *sql.DB, cpuInfo []CPUInfo, memoryInfo MemoryInfo, hostInfo HostInfo, processInfo []ProcessInfo, networkInfo NetworkInfo, username string) error {
-	// 插入或更新主机信息
-	hostInfoID, hostname, err := InsertHostInfo(db, hostInfo, username)
-	if err != nil {
-		return err
+	err := db.QueryRow(querySQL, hostInfoID).Scan(&existingID, &cpuInfoJSON, &memoryInfoJSON, &processInfoJSON, &networkInfoJSON)
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("failed to query system_info: %v", err)
 	}
 
-	// 插入内存信息
-	memoryInfoID, err := InsertMemoryInfo(db, memoryInfo, hostInfoID, hostname)
-	if err != nil {
-		return err
+	// 获取当前时间并格式化
+	currentTime := time.Now().UTC().Format(time.RFC3339)
+
+	// 创建新的数据实例
+	cpuData := CPUData{
+		Time: currentTime,
+		Data: cpuInfo,
+	}
+	memoryData := MemoryData{
+		Time: currentTime,
+		Data: memoryInfo,
+	}
+	processData := ProcessData{
+		Time: currentTime,
+		Data: processInfo,
+	}
+	networkData := NetworkData{
+		Time: currentTime,
+		Data: networkInfo,
 	}
 
-	// 插入 CPU 信息
-	var cpuInfoIDs []int
-	for _, cpu := range cpuInfo {
-		id, err := InsertCpuInfo(db, cpu, hostInfoID, hostname)
-		if err != nil {
-			return err
+	// 处理 CPU 信息
+	var cpuInfoArray []CPUData
+	if existingID > 0 {
+		// 如果已存在记录，反序列化现有的 cpu_info JSON
+		if err := json.Unmarshal(cpuInfoJSON, &cpuInfoArray); err != nil {
+			return fmt.Errorf("failed to unmarshal existing cpu_info: %v", err)
 		}
-		cpuInfoIDs = append(cpuInfoIDs, id)
 	}
-	// 插入网卡信息
-	netInfoID, err := InsertNetworkInfo(db, networkInfo, hostInfoID, hostname)
+	// 将新的 CPUData 添加到数组中
+	cpuInfoArray = append(cpuInfoArray, cpuData)
+	cpuInfoData, err := json.Marshal(cpuInfoArray)
 	if err != nil {
-		return err
-	}
-	// 插入进程信息
-	var processInfoIDs []int
-	for _, proc := range processInfo {
-		id, err := InsertProcessInfo(db, proc, hostInfoID, hostname)
-		if err != nil {
-			return err
-		}
-		processInfoIDs = append(processInfoIDs, id)
+		return fmt.Errorf("failed to marshal updated cpu_info: %v", err)
 	}
 
-	// 插入系统信息，使用最近插入的 CPU、内存、主机和进程信息的 ID
-	systemInfoSQL := `
-    INSERT INTO system_info (cpu_info_id, memory_info_id, host_info_id, process_info_id,network_info_id, system_info_created_at)
-    VALUES ($1, $2, $3, $4,$5, CURRENT_TIMESTAMP)`
-	_, err = db.Exec(systemInfoSQL, cpuInfoIDs[0], memoryInfoID, hostInfoID, processInfoIDs[0], netInfoID)
-	if err != nil {
-		fmt.Printf("Failed to insert system info: %v", err)
-		return err
+	// 处理 Memory 信息
+	var memoryInfoArray []MemoryData
+	if existingID > 0 {
+		if err := json.Unmarshal(memoryInfoJSON, &memoryInfoArray); err != nil {
+			return fmt.Errorf("failed to unmarshal existing memory_info: %v", err)
+		}
 	}
-	fmt.Println("Inserted system_info successfully")
+	memoryInfoArray = append(memoryInfoArray, memoryData)
+	memoryInfoData, err := json.Marshal(memoryInfoArray)
+	if err != nil {
+		return fmt.Errorf("failed to marshal updated memory_info: %v", err)
+	}
+
+	// 处理 Process 信息
+	var processInfoArray []ProcessData
+	if existingID > 0 {
+		if err := json.Unmarshal(processInfoJSON, &processInfoArray); err != nil {
+			return fmt.Errorf("failed to unmarshal existing process_info: %v", err)
+		}
+	}
+	processInfoArray = append(processInfoArray, processData)
+	processInfoData, err := json.Marshal(processInfoArray)
+	if err != nil {
+		return fmt.Errorf("failed to marshal updated process_info: %v", err)
+	}
+
+	// 处理 Network 信息
+	var networkInfoArray []NetworkData
+	if existingID > 0 {
+		if err := json.Unmarshal(networkInfoJSON, &networkInfoArray); err != nil {
+			return fmt.Errorf("failed to unmarshal existing network_info: %v", err)
+		}
+	}
+	networkInfoArray = append(networkInfoArray, networkData)
+	networkInfoData, err := json.Marshal(networkInfoArray)
+	if err != nil {
+		return fmt.Errorf("failed to marshal updated network_info: %v", err)
+	}
+
+	if existingID > 0 {
+		// 更新现有记录
+		_, err = db.Exec(`
+		UPDATE system_info
+		SET cpu_info = $1,
+		    memory_info = $2,
+		    process_info = $3,
+		    network_info = $4,
+		    created_at = CURRENT_TIMESTAMP
+		WHERE id = $5`,
+			cpuInfoData, memoryInfoData, processInfoData, networkInfoData, existingID)
+		if err != nil {
+			return fmt.Errorf("failed to update system_info: %v", err)
+		}
+		fmt.Println("Updated existing system_info successfully")
+	} else {
+		// 插入新的记录
+		insertSQL := `
+		INSERT INTO system_info (host_info_id, cpu_info, memory_info, process_info, network_info, created_at)
+		VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`
+
+		_, err := db.Exec(insertSQL, hostInfoID, cpuInfoData, memoryInfoData, processInfoData, networkInfoData)
+		if err != nil {
+			return fmt.Errorf("failed to insert system_info: %v", err)
+		}
+		fmt.Println("Inserted new system_info successfully")
+	}
 
 	return nil
 }
@@ -376,6 +299,7 @@ func InsertHostandToken(db *sql.DB, UserName string, Token string) error {
 
 	return nil
 }
+
 func ReadDB(db *sql.DB, queryType, from, to string, hostname string) (map[string]interface{}, error) {
 	result := make(map[string]interface{})
 

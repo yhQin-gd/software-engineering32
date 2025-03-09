@@ -1,0 +1,6 @@
+db: # 数据库配置
+  user: postgres
+  password: czh20040301
+  host: localhost
+  port: 5432
+  name: servermonitor
