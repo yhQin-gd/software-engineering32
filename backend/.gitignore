@@ -1,3 +1,4 @@
 *.exe
 *.sum
-config/configs/*.yaml
+server/config/configs/*.yaml
+*.yaml
