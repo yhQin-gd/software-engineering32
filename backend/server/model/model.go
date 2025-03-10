@@ -622,44 +622,6 @@ func ReadDB(db *sql.DB, queryType, from, to string, hostname string) (map[string
 	return result, nil
 }
 
-func UpdateDB(db *sql.DB, host_id int, new_cpu_info []map[string]string, new_memory_info map[string]string) error {
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-
-	// 更新CPU信息
-	for _, cpu_info := range new_cpu_info {
-		_, err = tx.Exec(
-			"UPDATE cpu_info SET model_name = $1, cores_num = $2, percent = $3, updated_at = $4 WHERE host_id = $5",
-			cpu_info["ModelName"], cpu_info["CoresNum"], cpu_info["Percent"], time.Now(), host_id,
-		)
-		if err != nil {
-			tx.Rollback()
-			return err
-		}
-	}
-
-	// 更新内存信息
-	_, err = tx.Exec(
-		"UPDATE memory_info SET total = $1, available = $2, used = $3, free = $4, user_percent = $5, updated_at = $6 WHERE host_id = $7",
-		new_memory_info["Total"], new_memory_info["Available"], new_memory_info["Used"], new_memory_info["Free"], new_memory_info["UserPercent"], time.Now(), host_id,
-	)
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	// 提交事务
-	err = tx.Commit()
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("Updated CPU and Memory info for host_id: %d\n", host_id)
-	return nil
-}
-
 func DeleteDB(db *sql.DB, host_id int) error {
 	tx, err := db.Begin()
 	if err != nil {
@@ -702,3 +664,201 @@ func DeleteDB(db *sql.DB, host_id int) error {
 
 	return nil
 }
+
+
+//更新主机信息
+func UpdateHostInfo(db *sql.DB, host_id int, host_info map[string]string) error {
+
+	//查看该主机的host_id是否存在
+	err := db.QueryRow("SELECT id FROM host_info WHERE host_id = ", host_id).Scan(&host_id)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(
+		"UPDATE host_info SET hostname = $1, os = $2, platform = $3, kernel_arch = $4, updated_at = $5 WHERE host_id = $6",
+		host_info["Hostname"], host_info["OS"], host_info["Platform"], host_info["KernelArch"], time.Now(), host_id,
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// 更新系统信息
+func UpdateSystemInfo(db *sql.DB, hostInfoID int, cpuInfo *CPUInfo, memoryInfo *MemoryInfo, processInfo *ProcessInfo, networkInfo *NetworkInfo) error {
+    // 查询system_info表中的host_id是否存在
+	var existingID int
+	err := db.QueryRow("SELECT id FROM system_info WHERE host_info_id = $1", hostInfoID).Scan(&existingID)
+	if err != nil {
+		return fmt.Errorf("failed to query system_info table: %v", err)
+	}
+	if err == sql.ErrNoRows {
+		return fmt.Errorf("no matching host_id found in system_info table")
+	}
+
+	tx,err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %v", err)
+	}
+
+    // 获取当前时间并格式化
+    currentTime := time.Now().UTC().Format(time.RFC3339)
+
+    // 删除超过7天的数据
+    sevenDaysAgo := time.Now().UTC().AddDate(0, 0, -7).Format(time.RFC3339)
+    deleteSQL := `
+        UPDATE system_info
+        SET cpu_info = jsonb_set(cpu_info, '{cpu_info}', (cpu_info->'cpu_info') - (SELECT jsonb_agg(key) FROM jsonb_each(cpu_info->'cpu_info') WHERE (value->>'time')::timestamp < $1),
+            memory_info = jsonb_set(memory_info, '{memory_info}', (memory_info->'memory_info') - (SELECT jsonb_agg(key) FROM jsonb_each(memory_info->'memory_info') WHERE (value->>'time')::timestamp < $1),
+            process_info = jsonb_set(process_info, '{process_info}', (process_info->'process_info') - (SELECT jsonb_agg(key) FROM jsonb_each(process_info->'process_info') WHERE (value->>'time')::timestamp < $1),
+            network_info = jsonb_set(network_info, '{network_info}', (network_info->'network_info') - (SELECT jsonb_agg(key) FROM jsonb_each(network_info->'network_info') WHERE (value->>'time')::timestamp < $1)
+        WHERE host_info_id = $2
+    `
+    _, err = tx.Exec(deleteSQL, sevenDaysAgo, hostInfoID)
+    if err != nil {
+        return err
+    }
+
+	// 初始化 existingData
+	existingData := make(map[string]json.RawMessage)
+
+	// 查询现有数据
+	querySQL := `
+		SELECT cpu_info, memory_info, process_info, network_info
+		FROM system_info
+		WHERE host_info_id = $1
+	`
+	var cpuInfoJSON, memoryInfoJSON, processInfoJSON, networkInfoJSON json.RawMessage
+	err = tx.QueryRow(querySQL, hostInfoID).Scan(&cpuInfoJSON, &memoryInfoJSON, &processInfoJSON, &networkInfoJSON)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+
+	// 将查询结果赋值给 existingData
+	existingData["cpu_info"] = cpuInfoJSON
+	existingData["memory_info"] = memoryInfoJSON
+	existingData["process_info"] = processInfoJSON
+	existingData["network_info"] = networkInfoJSON
+
+    // 处理 CPU 信息
+    if cpuInfo != nil {
+        var cpuInfoArray []CPUData
+        if existingData["cpu_info"] != nil {
+            if err := json.Unmarshal(existingData["cpu_info"], &cpuInfoArray); err != nil {
+                return err
+            }
+        }
+        cpuData := CPUData{
+            Time: currentTime,
+            Data: *cpuInfo,
+        }
+        cpuInfoArray = append(cpuInfoArray, cpuData)
+        cpuInfoJSON, err := json.Marshal(cpuInfoArray)
+        if err != nil {
+			tx.Rollback()
+            return err
+        }
+        existingData["cpu_info"] = cpuInfoJSON
+    }
+
+    // 处理 Memory 信息
+    if memoryInfo != nil {
+        var memoryInfoArray []MemoryData
+        if existingData["memory_info"] != nil {
+            if err := json.Unmarshal(existingData["memory_info"], &memoryInfoArray); err != nil {
+                return err
+            }
+        }
+        memoryData := MemoryData{
+            Time: currentTime,
+            Data: *memoryInfo,
+        }
+        memoryInfoArray = append(memoryInfoArray, memoryData)
+        memoryInfoJSON, err := json.Marshal(memoryInfoArray)
+        if err != nil {
+			tx.Rollback()
+            return err
+        }
+        existingData["memory_info"] = memoryInfoJSON
+    }
+
+    // 处理 Process 信息
+    if processInfo != nil {
+        var processInfoArray []ProcessData
+        if existingData["process_info"] != nil {
+            if err := json.Unmarshal(existingData["process_info"], &processInfoArray); err != nil {
+                return err
+            }
+        }
+        processData := ProcessData{
+            Time: currentTime,
+            Data: *processInfo,
+        }
+        processInfoArray = append(processInfoArray, processData)
+        processInfoJSON, err := json.Marshal(processInfoArray)
+        if err != nil {
+			tx.Rollback()
+            return err
+        }
+        existingData["process_info"] = processInfoJSON
+    }
+
+    // 处理 Network 信息
+    if networkInfo != nil {
+        var networkInfoArray []NetworkData
+        if existingData["network_info"] != nil {
+            if err := json.Unmarshal(existingData["network_info"], &networkInfoArray); err != nil {
+                return err
+            }
+        }
+        networkData := NetworkData{
+            Time: currentTime,
+            Data: *networkInfo,
+        }
+        networkInfoArray = append(networkInfoArray, networkData)
+        networkInfoJSON, err := json.Marshal(networkInfoArray)
+        if err != nil {
+			tx.Rollback()
+            return err
+        }
+        existingData["network_info"] = networkInfoJSON
+    }
+
+    // 更新数据库
+    updateSQL := `
+        UPDATE system_info
+        SET cpu_info = COALESCE($1, cpu_info),
+            memory_info = COALESCE($2, memory_info),
+            process_info = COALESCE($3, process_info),
+            network_info = COALESCE($4, network_info),
+        WHERE host_info_id = $5
+    `
+    _, err = tx.Exec(updateSQL, existingData["cpu_info"], existingData["memory_info"], existingData["process_info"], existingData["network_info"], hostInfoID)
+    if err != nil {
+		tx.Rollback()
+        return err
+    }
+
+    return nil
+}
+
+//更新token表
+func UpdateToken(db *sql.DB,hostName string, token string,lastHeartBeat time.Time ,status string) error {
+	//判断hostandtoken表是否存在该hostname
+	var existingName string
+	err := db.QueryRow("SELECT hostname FROM hostandtoken WHERE hostname = ", hostName).Scan(&existingName)
+	if err != nil {
+		return err
+	}
+	if err == sql.ErrNoRows {
+		return err
+	}
+
+	_, err = db.Exec("UPDATE hostandtoken SET token = ?, last_heartbeat = ?, status = ? WHERE hostname = ?", token, lastHeartBeat, status, hostName)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
