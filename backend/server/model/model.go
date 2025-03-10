@@ -3,6 +3,7 @@ package model
 import (
 	"cmd/server/config"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -25,7 +26,7 @@ type Claims struct {
 }
 
 // 连接数据库并创建表
-func InitDB() (*sql.DB, error) { // 
+func InitDB() (*sql.DB, error) { //
 	// connStr := "host=192.168.31.251 port=5432 user=postgres password=cCyjKKMyweCer8f3 dbname=monitor sslmode=disable"
 	config, _ := config.LoadConfig()
 	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
@@ -35,127 +36,11 @@ func InitDB() (*sql.DB, error) { //
 		config.DB.Password,
 		config.DB.Name,
 	)
-	
+
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		return nil, err
 	}
-
-// 	// cpu表
-// 	createCPUSQL := `
-// 	CREATE TABLE IF NOT EXISTS cpu_info (
-// 		id SERIAL PRIMARY KEY,
-// 		host_id INT REFERENCES host_info(id),
-// 		model_name TEXT NOT NULL,
-// 		cores_num INT NOT NULL,
-// 		percent FLOAT NOT NULL,
-// 		cpu_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-// 	);
-	
-// `
-// 	// memory表
-// 	createMEMSQL := `
-// 	CREATE TABLE IF NOT EXISTS memory_info (
-// 		id SERIAL PRIMARY KEY,
-// 		host_id INT REFERENCES host_info(id),
-// 		total TEXT NOT NULL,
-// 		available TEXT NOT NULL,
-// 		used TEXT NOT NULL,
-// 		free TEXT NOT NULL,
-// 		user_percent TEXT NOT NULL,
-// 		mem_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-// 	);
-	
-// `
-// 	// host表
-// 	createHOSTSQL := `
-// 	CREATE TABLE IF NOT EXISTS host_info (
-// 		id SERIAL PRIMARY KEY,
-// 		hostname TEXT  UNIQUE,
-// 		os TEXT NOT NULL,
-// 		platform TEXT NOT NULL,
-// 		kernel_arch TEXT NOT NULL,
-// 		host_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-// 	);`
-// 	// process表
-// 	createPROSQL := `
-// 	CREATE TABLE IF NOT EXISTS process_info (
-// 		id SERIAL PRIMARY KEY,
-// 		host_id INT REFERENCES host_info(id),
-// 		pid INT NOT NULL,
-// 		cpu_percent FLOAT NOT NULL,
-// 		mem_percent FLOAT NOT NULL,
-// 		cmdline TEXT NOT NULL,
-// 		pro_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-// 	);
-	
-// `	
-// 	// net_info表
-// 	createNetSQL := `
-// 	CREATE TABLE IF NOT EXISTS network_info (
-// 		id SERIAL PRIMARY KEY,
-// 		host_id INT REFERENCES host_info(id),
-// 		bytesrecv INT NOT NULL,
-// 		bytessent INT NOT NULL,
-// 		net_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-// 	);`
-
-// 	// system_info表
-// 	createTableSQL := `
-// 	ALTER TABLE system_info
-// ADD COLUMN network_info_id INT REFERENCES network_info(id);
-// 	CREATE TABLE IF NOT EXISTS system_info (
-// 		id SERIAL PRIMARY KEY,
-// 		cpu_info_id INT REFERENCES cpu_info(id),
-// 		memory_info_id INT REFERENCES memory_info(id),
-// 		host_info_id INT REFERENCES host_info(id),
-// 		process_info_id INT REFERENCES process_info(id),
-// 		system_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-// 	);`
-
-// 	//token表
-// 	createTokenSQL := `
-// 	CREATE TABLE IF NOT EXISTS hostandtoken (
-// 		id SERIAL PRIMARY KEY,
-// 		host_name TEXT NOT NULL,
-// 		token TEXT NOT NULL
-// 	);`
-
-// 	_, err = db.Exec(createCPUSQL)
-// 	if err != nil {
-// 		fmt.Printf("failed to create cpu_info table: %v", err)
-// 		return nil, err
-// 	}
-// 	_, err = db.Exec(createMEMSQL)
-// 	if err != nil {
-// 		fmt.Printf("failed to create memory_info table: %v", err)
-// 		return nil, err
-// 	}
-// 	_, err = db.Exec(createHOSTSQL)
-// 	if err != nil {
-// 		fmt.Printf("failed to create host_info table: %v", err)
-// 		return nil, err
-// 	}
-// 	_, err = db.Exec(createPROSQL)
-// 	if err != nil {
-// 		fmt.Printf("failed to create process_info table: %v", err)
-// 		return nil, err
-// 	}
-// 	_, err = db.Exec(createNetSQL)
-// 	if err != nil {
-// 		fmt.Printf("failed to create net_info table: %v", err)
-// 		return nil, err
-// 	}
-// 	_, err = db.Exec(createTableSQL)
-// 	if err != nil {
-// 		fmt.Printf("failed to create system_info table: %v", err)
-// 		return nil, err
-// 	}
-// 	_, err = db.Exec(createTokenSQL)
-// 	if err != nil {
-// 		fmt.Printf("failed to create hostandtoken table: %v", err)
-// 		return nil, err
-// 	}
 	return db, nil
 }
 
@@ -376,6 +261,63 @@ func InsertHostandToken(db *sql.DB, UserName string, Token string) error {
 
 	return nil
 }
+func ReadMemoryInfo(db *sql.DB, hostname string, from, to time.Time) (map[string]interface{}, error) {
+	result :=make(map[string]interface{})
+
+	// 查询 JSON 数据
+	rows, err := db.Query(`SELECT id, mem_info FROM memory_info WHERE hostname = $1`, hostname, )
+	if err != nil {
+		return nil, fmt.Errorf("查询内存信息时发生错误: %v", err)
+	}
+	defer rows.Close()
+
+	var memoryData []map[string]interface{}
+
+	// 遍历查询结果
+	for rows.Next() {
+		var id int
+		var memInfoJSON []byte
+
+		// 读取查询结果
+		err := rows.Scan(&id, &memInfoJSON)
+		if err != nil {
+			return nil, fmt.Errorf("扫描内存信息记录时发生错误: %v", err)
+		}
+
+		// 解析 JSON 数据
+		var memInfo map[string]interface{}
+		if err := json.Unmarshal(memInfoJSON, &memInfo); err != nil {
+			return nil, fmt.Errorf("解析 JSON 数据时发生错误: %v", err)
+		}
+
+		// 获取 updated_at 字段
+		updatedAtStr, ok := memInfo["updated_at"].(string)
+		if !ok {
+			continue // 如果 updated_at 字段不存在或类型错误，跳过该记录
+		}
+
+		// 将 updated_at 字符串转换为 time.Time
+		updatedAt, err := time.Parse(time.RFC3339, updatedAtStr)
+		if err != nil {
+			return nil, fmt.Errorf("解析 updated_at 字段时发生错误: %v", err)
+		}
+
+		// 判断记录是否在指定时间段内
+		if (updatedAt.Equal(from) || updatedAt.After(from)) && updatedAt.Before(to) {
+			memoryData = append(memoryData, memInfo)
+		}
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("处理内存信息记录时发生错误: %v", err)
+	}
+
+	// 将过滤后的数据插入 result
+	result["memory"] = memoryData
+
+	return result, nil
+}
+
 func ReadDB(db *sql.DB, queryType, from, to string, hostname string) (map[string]interface{}, error) {
 	result := make(map[string]interface{})
 
@@ -404,27 +346,18 @@ func ReadDB(db *sql.DB, queryType, from, to string, hostname string) (map[string
 
 	// 查询内存信息
 	if queryType == "memory" || queryType == "all" {
-		row := db.QueryRow("SELECT id, total, available, used, free, user_percent, mem_info_created_at FROM memory_info WHERE hostname = $1 AND mem_info_created_at BETWEEN $2 AND $3", hostname, from, to)
+		row := db.QueryRow("SELECT id, mem_info, memory_info_created_at FROM system info WHERE hostname = $1 AND mem_info_created_at", hostname)
 		var id int
-		var total, available, used, free, userPercent string
+		var memInfoJSON []byte
 		var createdAt time.Time
-		err := row.Scan(&id, &total, &available, &used, &free, &userPercent, &createdAt)
+		err := row.Scan(&id, &memInfoJSON, &createdAt)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				return nil, fmt.Errorf("未找到指定的内存记录")
 			}
 			return nil, fmt.Errorf("查询内存信息时发生错误: %v", err)
 		}
-		result["memory"] = map[string]interface{}{
-			"id":                  id,
-			"total":               total,
-			"available":           available,
-			"used":                used,
-			"free":                free,
-			"user_percent":        userPercent,
-			"hostname":            hostname,
-			"mem_info_created_at": createdAt,
-		}
+		result["memory"] =
 	}
 	// 查询网卡信息
 	if queryType == "net" || queryType == "all" {

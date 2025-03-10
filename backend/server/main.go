@@ -9,16 +9,16 @@ import (
 	"cmd/server/middlewire/cors"
 	db "cmd/server/model/init"
 	"fmt"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"log"
 	"os"
 
 	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func main() {
-	go monitor.CheckServerStatus()//读取DBConfig.yaml文件
+	go monitor.CheckServerStatus() //读取DBConfig.yaml文件
 	config, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("加载配置失败: %v", err)
@@ -34,7 +34,7 @@ func main() {
 	fmt.Println(os.Getenv("DB_HOST"))
 	fmt.Println(os.Getenv("DB_PORT"))
 	fmt.Println(os.Getenv("DB_NAME"))
-	
+
 	router := gin.Default()
 	router.Use(cors.CORSMiddleware())
 	// 连接数据库
@@ -47,8 +47,10 @@ func main() {
 	}
 
 	// 注册 Swagger 路由
-    router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, ginSwagger.URL("/docs/swagger.json")))
-
+	router.GET("/swagger/*any", func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "*")
+		ginSwagger.WrapHandler(swaggerFiles.Handler, ginSwagger.URL("/docs/swagger.json"))(c)
+	})
 	router.POST("/agent/register", login.Register)
 	router.POST("/agent/login", login.Login)
 	// 需要 JWT 认证的路由
