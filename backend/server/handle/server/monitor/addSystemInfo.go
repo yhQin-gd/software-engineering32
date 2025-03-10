@@ -4,16 +4,17 @@ import (
 	"cmd/server/model"
 	"database/sql"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	_ "github.com/lib/pq"
 	"log"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
+	_ "github.com/lib/pq"
 )
 
 // RequestData 用于接收系统监控数据的请求体
 // @Description RequestData 包含所有需要收集的系统信息
 type RequestData struct {
-	CPUInfo  model.CPUInfo     `json:"cpu_info"`  // CPU 信息
+	CPUInfo  []model.CPUInfo   `json:"cpu_info"`  // CPU 信息
 	HostInfo model.HostInfo    `json:"host_info"` // 主机信息
 	MemInfo  model.MemoryInfo  `json:"mem_info"`  // 内存信息
 	ProInfo  model.ProcessInfo `json:"pro_info"`  // 进程信息
