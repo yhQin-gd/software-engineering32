@@ -144,7 +144,7 @@ func InsertHostInfo(db *sql.DB, hostInfo HostInfo, username string) error {
 	} else {
 		// 插入新的主机记录
 		insertSQL := `
-        INSERT INTO host_info (hostname, os, platform, kernel_arch, host_info_created_at, user_name)
+        INSERT INTO host_info (hostname, os, platform, kernel_arch, created_at, user_name)
         VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, $5)
         RETURNING id, hostname`
 		err = db.QueryRow(insertSQL, hostInfo.Hostname, hostInfo.OS, hostInfo.Platform, hostInfo.KernelArch, username).Scan(&hostInfoID, &hostname)

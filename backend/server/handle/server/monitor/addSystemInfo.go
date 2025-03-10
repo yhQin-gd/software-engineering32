@@ -1,17 +1,13 @@
 package monitor
 
 import (
-	"cmd/server/middlewire"
 	"cmd/server/model"
 	"database/sql"
 	"fmt"
-	"log"
-	"net/http"
-	"strings"
-
-	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
+	"log"
+	"net/http"
 )
 
 // RequestData 用于接收系统监控数据的请求体
@@ -65,34 +61,11 @@ func ReceiveAndStoreSystemMetrics(c *gin.Context) {
 		fmt.Println("No matching token.")
 	}
 	if len(tokenh) != 16 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Wrong token length"})
-		return
+		//c.JSON(http.StatusBadRequest, gin.H{"error": "Wrong token length"})
+		//return
 	} else if tokenh != tokens {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Unequal string"})
-		return
-	}
-
-	// 从 Authorization Header 中提取 JWT token
-	authHeader := c.GetHeader("Authorization")
-	if authHeader == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header is missing"})
-		return
-	}
-	// 提取 token（格式为 "Bearer <token>"）
-	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-	if tokenString == authHeader {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token format"})
-		return
-	}
-
-	// 解析 token 并验证
-	claims := &middlewire.Claims{}
-	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-		return middlewire.JwtKey, nil
-	})
-	if err != nil || !token.Valid {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
-		return
+		//c.JSON(http.StatusBadRequest, gin.H{"error": "Unequal string"})
+		//return
 	}
 
 	// 更新心跳时间和状态为在线
@@ -107,13 +80,24 @@ func ReceiveAndStoreSystemMetrics(c *gin.Context) {
 	}
 
 	// 从解析的 token 中获取 username存入数据库
-	username := claims.Username
+	// 从上下文中获取用户名
+	Username, exists := c.Get("username")
+	if !exists {
+		log.Printf("未找到用户名")
+		c.JSON(401, gin.H{
+			"code":    401,
+			"success": false,
+			"message": "未找到用户信息",
+		})
+		return
+	}
+	username := Username.(string)
 
 	// 将数据插入数据库
 	// 插入 host_info 表
 	err = model.InsertHostInfo(db, requestData.HostInfo, username)
 	if err != nil {
-		s := fmt.Sprintf("Failed to insert system info: %s", err)
+		s := fmt.Sprintf("Failed to insert host info: %s", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": s})
 		return
 	}
@@ -121,7 +105,7 @@ func ReceiveAndStoreSystemMetrics(c *gin.Context) {
 	// 插入 hostandtoken 表
 	err = model.InsertHostandToken(db, requestData.HostInfo.Hostname, tokenh)
 	if err != nil {
-		s := fmt.Sprintf("Failed to insert system info: %s", err)
+		s := fmt.Sprintf("Failed to insert host and token info %s", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": s})
 		return
 	}
