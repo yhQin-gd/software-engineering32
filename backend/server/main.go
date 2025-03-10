@@ -57,7 +57,7 @@ func main() {
 	auth := router.Group("/agent", middlewire.JWTAuthMiddleware())
 	{
 		auth.POST("/install", install.InstallAgent)
-		auth.POST("/system_info", monitor.GetMessage)
+		auth.POST("/system_info", monitor.ReceiveAndStoreSystemMetrics)
 		auth.GET("/list", monitor.ListAgent)
 		router.GET("/:hostname", monitor.GetAgentInfo)
 	}

@@ -14,18 +14,17 @@ import (
 	_ "github.com/lib/pq"
 )
 
-
 // RequestData 用于接收系统监控数据的请求体
 // @Description RequestData 包含所有需要收集的系统信息
 type RequestData struct {
-	CPUInfo  []model.CPUInfo     `json:"cpu_info"`  // CPU 信息
-	HostInfo model.HostInfo      `json:"host_info"` // 主机信息
-	MemInfo  model.MemoryInfo    `json:"mem_info"`  // 内存信息
-	ProInfo  []model.ProcessInfo `json:"pro_info"`  // 进程信息
-	NetInfo  model.NetworkInfo   `json:"net_info"`  // 网络信息
+	CPUInfo  model.CPUInfo     `json:"cpu_info"`  // CPU 信息
+	HostInfo model.HostInfo    `json:"host_info"` // 主机信息
+	MemInfo  model.MemoryInfo  `json:"mem_info"`  // 内存信息
+	ProInfo  model.ProcessInfo `json:"pro_info"`  // 进程信息
+	NetInfo  model.NetworkInfo `json:"net_info"`  // 网络信息
 }
 
-// GetMessage 接收并处理系统监控数据
+// AddSystemInfo 接收并处理系统监控数据
 //
 // @Summary 接收系统监控信息（CPU、内存、主机信息等）
 // @Description 该API用于接收客户端发送的系统监控数据，并验证token和JWT后将数据存储到数据库中。
@@ -38,7 +37,7 @@ type RequestData struct {
 // @Failure 401 {object} map[string]string "授权头缺失或无效的token格式或无效的JWT token"
 // @Failure 500 {object} map[string]string "数据库操作失败"
 // @Router /monitor [post]
-func GetMessage(c *gin.Context) {
+func ReceiveAndStoreSystemMetrics(c *gin.Context) {
 	// 初始化数据库
 	db, err := model.InitDB()
 	if err != nil {
@@ -58,8 +57,8 @@ func GetMessage(c *gin.Context) {
 	tokenh := requestData.HostInfo.Token
 	var tokens string
 	querySQL := `
-	SELECT token (SELECT 1 FROM hostandtoken WHERE host_name = $1)
-	FROM hostandtoken WHERE hostname = $1`
+	SELECT token 
+	FROM hostandtoken WHERE hostname = $1` //(SELECT 1 FROM hostandtoken WHERE host_name = $1)
 
 	err = db.QueryRow(querySQL, requestData.HostInfo.Hostname).Scan(&tokens)
 	if err == sql.ErrNoRows {
@@ -95,6 +94,7 @@ func GetMessage(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
 		return
 	}
+
 	// 更新心跳时间和状态为在线
 	updateSQL := `
     UPDATE hostandtoken 
@@ -105,10 +105,29 @@ func GetMessage(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update heartbeat and status"})
 		return
 	}
+
 	// 从解析的 token 中获取 username存入数据库
 	username := claims.Username
+
 	// 将数据插入数据库
-	err = model.InsertSystemInfo(db, requestData.CPUInfo, requestData.MemInfo, requestData.HostInfo, requestData.ProInfo, requestData.NetInfo, username)
+	// 插入 host_info 表
+	err = model.InsertHostInfo(db, requestData.HostInfo, username)
+	if err != nil {
+		s := fmt.Sprintf("Failed to insert system info: %s", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": s})
+		return
+	}
+
+	// 插入 hostandtoken 表
+	err = model.InsertHostandToken(db, requestData.HostInfo.Hostname, tokenh)
+	if err != nil {
+		s := fmt.Sprintf("Failed to insert system info: %s", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": s})
+		return
+	}
+
+	// 插入 system_info 表
+	err = model.InsertSystemInfo(db, requestData.HostInfo.ID, requestData.CPUInfo, requestData.MemInfo, requestData.ProInfo, requestData.NetInfo)
 	if err != nil {
 		s := fmt.Sprintf("Failed to insert system info: %s", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": s})

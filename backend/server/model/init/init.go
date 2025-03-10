@@ -10,91 +10,98 @@ import (
 
 
 const createTableSQL = `
--- ALTER TABLE hostandtoken
--- ADD COLUMN last_heartbeat TIMESTAMP DEFAULT NOW(),
--- ADD COLUMN status VARCHAR(10) DEFAULT 'offline';
+-- roles 表
+CREATE TABLE IF NOT EXISTS roles (
+    id SERIAL PRIMARY KEY,
+    role_name VARCHAR(50) UNIQUE NOT NULL,
+    description TEXT
+);
 
--- user 表
+-- users 表
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
-    name VARCHAR NOT NULL,
+    name VARCHAR UNIQUE NOT NULL,
     email VARCHAR UNIQUE NOT NULL,
     password VARCHAR NOT NULL,
-    isverified BOOLEAN DEFAULT FALSE
+    isverified BOOLEAN DEFAULT FALSE,
+    role_id INT REFERENCES roles(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- host表
 CREATE TABLE IF NOT EXISTS host_info (
 	id SERIAL PRIMARY KEY,
-	hostname TEXT  UNIQUE,
+    user_name VARCHAR REFERENCES users(name),
+	hostname VARCHAR(255)  UNIQUE,
 	os TEXT NOT NULL,
 	platform TEXT NOT NULL,
 	kernel_arch TEXT NOT NULL,
-	host_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- cpu表
-CREATE TABLE IF NOT EXISTS cpu_info (
-	id SERIAL PRIMARY KEY,
-	host_id INT REFERENCES host_info(id),
-	model_name TEXT NOT NULL,
-	cores_num INT NOT NULL,
-	percent FLOAT NOT NULL,
-	cpu_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- memory 表
-CREATE TABLE IF NOT EXISTS memory_info (
-	id SERIAL PRIMARY KEY,
-	host_id INT REFERENCES host_info(id),
-	total TEXT NOT NULL,
-	available TEXT NOT NULL,
-	used TEXT NOT NULL,
-	free TEXT NOT NULL,
-	user_percent TEXT NOT NULL,
-	mem_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- process 表
-CREATE TABLE IF NOT EXISTS process_info (
-	id SERIAL PRIMARY KEY,
-	host_id INT REFERENCES host_info(id),
-	pid INT NOT NULL,
-	cpu_percent FLOAT NOT NULL,
-	mem_percent FLOAT NOT NULL,
-	cmdline TEXT NOT NULL,
-	pro_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- net_info表
-CREATE TABLE IF NOT EXISTS network_info (
-	id SERIAL PRIMARY KEY,
-	host_id INT REFERENCES host_info(id),
-	bytesrecv INT NOT NULL,
-	bytessent INT NOT NULL,
-	net_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP -- TIMESTAMP WITH TIME ZONE 加上时区
 );
 
 -- system_info表
 CREATE TABLE IF NOT EXISTS system_info (
 	id SERIAL PRIMARY KEY,
-	cpu_info_id INT REFERENCES cpu_info(id),
-	memory_info_id INT REFERENCES memory_info(id),
 	host_info_id INT REFERENCES host_info(id),
-	process_info_id INT REFERENCES process_info(id),
-	system_info_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	network_info_id INT,
-    FOREIGN KEY (network_info_id) REFERENCES network_info(id)
+	host_name VARCHAR(255) REFERENCES host_info(hostname),
+	cpu_info JSONB,
+	memory_info JSONB,
+	process_info JSONB,
+	network_info JSONB,
+	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- token表
 CREATE TABLE IF NOT EXISTS hostandtoken (
 	id SERIAL PRIMARY KEY,
-	host_name TEXT NOT NULL,
+	host_name VARCHAR(255) REFERENCES host_info(hostname),
 	token TEXT NOT NULL,
 	last_heartbeat TIMESTAMP DEFAULT NOW(),
 	status VARCHAR(10) DEFAULT 'offline'
-);`
+);
+
+-- 在system_info表的host_info_id字段上创建索引，加速通过主机ID查找系统信息
+CREATE INDEX IF NOT EXISTS idx_system_info_host_info_id ON system_info(host_info_id);
+
+-- 对于system_info表中的JSONB字段(cpu_info, memory_info等)，如果需要根据某些键值进行查询，
+-- 可以考虑创建GIN (Generalized Inverted Index) 索引，例如：
+-- 假设经常需要基于cpu_info内的某个键（如percent）来查询
+CREATE INDEX IF NOT EXISTS idx_system_info_cpu_percent ON system_info USING GIN ((cpu_info->'percent') jsonb_path_ops);
+
+-- 在hostandtoken表的host_name字段上创建索引，加速主机名查找
+CREATE INDEX IF NOT EXISTS idx_hostandtoken_host_name ON hostandtoken(host_name);
+
+-- 如果经常按last_heartbeat查询或排序，可以在此字段上创建索引
+CREATE INDEX IF NOT EXISTS idx_hostandtoken_last_heartbeat ON hostandtoken(last_heartbeat);
+`
+
+// cpu_info示例，每次一新的数据就追加进json里面，这样可以保存多个时间戳的数据
+// {
+//     "cpu_info": [
+//         {
+//             "time": "2023-10-10T12:34:56Z",
+//             "data": {
+//                 "id": 1,
+//                 "model_name": "Intel Xeon E5-2678 v3",
+//                 "cores_num": 12,
+//                 "percent": 45.7,
+//                 "cpu_info_created_at": "2023-10-10T12:34:56Z",
+//                 "updated_at": "2023-10-10T12:34:56Z"
+//             }
+//         },
+//         {
+//             "time": "2023-10-10T12:35:56Z",
+//             "data": {
+//                 "id": 1,
+//                 "model_name": "Intel Xeon E5-2678 v3",
+//                 "cores_num": 12,
+//                 "percent": 50.2,
+//                 "cpu_info_created_at": "2023-10-10T12:35:56Z",
+//                 "updated_at": "2023-10-10T12:35:56Z"
+//             }
+//         }
+//     ]
+// }
 
 var DB *gorm.DB
 
@@ -140,3 +147,46 @@ func InitDB() error {
 
 	return nil
 }
+
+
+// -- cpu表
+// CREATE TABLE IF NOT EXISTS cpu_info (
+// 	id SERIAL PRIMARY KEY,
+// 	host_id INT REFERENCES host_info(id),
+// 	model_name TEXT NOT NULL,
+// 	cores_num INT NOT NULL,
+// 	percent NUMERIC(5,2) NOT NULL,
+// 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+// );
+
+// -- memory 表
+// CREATE TABLE IF NOT EXISTS memory_info (
+// 	id SERIAL PRIMARY KEY,
+// 	host_id INT REFERENCES host_info(id),
+// 	total NUMERIC(10,2) NOT NULL,
+// 	available NUMERIC(10,2) NOT NULL,
+// 	used NUMERIC(10,2) NOT NULL,
+// 	free NUMERIC(10,2) NOT NULL,
+// 	user_percent NUMERIC(5,2) NOT NULL,
+// 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP 
+// );
+
+// -- process 表
+// CREATE TABLE IF NOT EXISTS process_info (
+// 	id SERIAL PRIMARY KEY,
+// 	host_id INT REFERENCES host_info(id),
+// 	pid INT NOT NULL,
+// 	cpu_percent NUMERIC(5,2) NOT NULL,
+// 	mem_percent NUMERIC(5,2) NOT NULL,
+// 	cmdline TEXT NOT NULL,
+// 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+// );
+
+// -- net_info表
+// CREATE TABLE IF NOT EXISTS network_info (
+// 	id SERIAL PRIMARY KEY,
+// 	host_id INT REFERENCES host_info(id),
+// 	bytesrecv BIGINT NOT NULL,
+// 	bytessent BIGINT NOT NULL,
+// 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+//);
