@@ -1,6 +1,6 @@
 db: # 数据库配置
-  host: localhost
-  port: "5432"
   user: postgres
-  password: 07080031
+  password: czh20040301
+  host: localhost
+  port: 5432
   name: servermonitor

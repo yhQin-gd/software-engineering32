@@ -76,28 +76,21 @@ CREATE INDEX IF NOT EXISTS idx_hostandtoken_last_heartbeat ON hostandtoken(last_
 // cpu_info示例，每次一新的数据就追加进json里面，这样可以保存多个时间戳的数据
 // {
 //     "cpu_info": [
-//         {
-//             "time": "2023-10-10T12:34:56Z",
-//             "data": {
+// 			{
 //                 "id": 1,
 //                 "model_name": "Intel Xeon E5-2678 v3",
 //                 "cores_num": 12,
 //                 "percent": 45.7,
-//                 "cpu_info_created_at": "2023-10-10T12:34:56Z",
 //                 "updated_at": "2023-10-10T12:34:56Z"
-//             }
 //         },
 //         {
-//             "time": "2023-10-10T12:35:56Z",
-//             "data": {
 //                 "id": 1,
 //                 "model_name": "Intel Xeon E5-2678 v3",
 //                 "cores_num": 12,
 //                 "percent": 50.2,
-//                 "cpu_info_created_at": "2023-10-10T12:35:56Z",
 //                 "updated_at": "2023-10-10T12:35:56Z"
-//             }
-//         }
+//         },
+// 			…………
 //     ]
 // }
 
