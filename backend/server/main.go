@@ -18,7 +18,7 @@ import (
 )
 
 func main() {
-	go monitor.CheckServerStatus()//读取DBConfig.yaml文件
+	go monitor.CheckServerStatus() //读取DBConfig.yaml文件
 	config, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("加载配置失败: %v", err)
@@ -34,7 +34,7 @@ func main() {
 	fmt.Println(os.Getenv("DB_HOST"))
 	fmt.Println(os.Getenv("DB_PORT"))
 	fmt.Println(os.Getenv("DB_NAME"))
-	
+
 	router := gin.Default()
 	router.Use(cors.CORSMiddleware())
 	// 连接数据库
@@ -47,7 +47,7 @@ func main() {
 	}
 
 	// 注册 Swagger 路由
-    router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, ginSwagger.URL("/docs/swagger.json")))
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, ginSwagger.URL("/docs/swagger.json")))
 
 	router.POST("/agent/register", login.Register)
 	router.POST("/agent/login", login.Login)
@@ -57,7 +57,7 @@ func main() {
 		auth.POST("/install", install.InstallAgent)
 		auth.POST("/system_info", monitor.ReceiveAndStoreSystemMetrics)
 		auth.GET("/list", monitor.ListAgent)
-		router.GET("/:hostname", monitor.GetAgentInfo)
+		router.GET("/agent/:hostname", monitor.GetAgentInfo)
 	}
 	router.Run("0.0.0.0:8080")
 }

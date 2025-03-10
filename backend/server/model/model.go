@@ -133,7 +133,7 @@ func InsertHostInfo(db *sql.DB, hostInfo HostInfo, username string) error {
 		// 更新已存在的主机记录
 		updateSQL := `
         UPDATE host_info
-        SET host_info_created_at = CURRENT_TIMESTAMP
+        SET created_at = CURRENT_TIMESTAMP
         WHERE id = $1`
 		_, err = db.Exec(updateSQL, hostInfoID)
 		if err != nil {
@@ -158,7 +158,7 @@ func InsertHostInfo(db *sql.DB, hostInfo HostInfo, username string) error {
 	return nil
 }
 
-func InsertSystemInfo(db *sql.DB, hostInfoID int, cpuInfo CPUInfo, memoryInfo MemoryInfo, processInfo ProcessInfo, networkInfo NetworkInfo) error {
+func InsertSystemInfo(db *sql.DB, hostInfoID int, hostname string, cpuInfo CPUInfo, memoryInfo MemoryInfo, processInfo ProcessInfo, networkInfo NetworkInfo) error {
 	// 检查是否已经存在对应的 system_info 记录
 	var existingID int
 	var cpuInfoJSON, memoryInfoJSON, processInfoJSON, networkInfoJSON []byte
@@ -268,10 +268,10 @@ func InsertSystemInfo(db *sql.DB, hostInfoID int, cpuInfo CPUInfo, memoryInfo Me
 	} else {
 		// 插入新的记录
 		insertSQL := `
-		INSERT INTO system_info (host_info_id, cpu_info, memory_info, process_info, network_info, created_at)
-		VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`
+		INSERT INTO system_info (host_info_id, host_name,cpu_info, memory_info, process_info, network_info, created_at)
+		VALUES ($1, $2, $3, $4, $5,$6 ,CURRENT_TIMESTAMP)`
 
-		_, err := db.Exec(insertSQL, hostInfoID, cpuInfoData, memoryInfoData, processInfoData, networkInfoData)
+		_, err := db.Exec(insertSQL, hostInfoID, hostname, cpuInfoData, memoryInfoData, processInfoData, networkInfoData)
 		if err != nil {
 			return fmt.Errorf("failed to insert system_info: %v", err)
 		}
@@ -300,7 +300,7 @@ func InsertHostandToken(db *sql.DB, UserName string, Token string) error {
 }
 func ReadMemoryInfo(db *sql.DB, hostname string, from, to string, result map[string]interface{}) error {
 	// 查询 JSON 数据
-	rows, err := db.Query(`SELECT id, memory_info FROM system_info WHERE hostname = $1`, hostname)
+	rows, err := db.Query(`SELECT id, memory_info FROM system_info WHERE host_name = $1`, hostname)
 	if err != nil {
 		return fmt.Errorf("查询内存信息时发生错误: %v", err)
 	}
@@ -364,9 +364,9 @@ func ReadMemoryInfo(db *sql.DB, hostname string, from, to string, result map[str
 }
 func ReadCPUInfo(db *sql.DB, hostname string, from, to string, result map[string]interface{}) error {
 	// 查询 JSON 数据
-	rows, err := db.Query(`SELECT id, cpu_info FROM system_info WHERE hostname = $1`, hostname)
+	rows, err := db.Query(`SELECT id, cpu_info FROM system_info WHERE host_name = $1`, hostname)
 	if err != nil {
-		return fmt.Errorf("查询内存信息时发生错误: %v", err)
+		return fmt.Errorf("查询cpu信息时发生错误: %v", err)
 	}
 	defer rows.Close()
 
@@ -380,7 +380,7 @@ func ReadCPUInfo(db *sql.DB, hostname string, from, to string, result map[string
 		// 读取查询结果
 		err := rows.Scan(&id, &cpuJSON)
 		if err != nil {
-			return fmt.Errorf("扫描内存信息记录时发生错误: %v", err)
+			return fmt.Errorf("扫描cpu信息记录时发生错误: %v", err)
 		}
 
 		// 解析 JSON 数据（假设 mem_info 是一个 JSON 数组）
@@ -418,7 +418,7 @@ func ReadCPUInfo(db *sql.DB, hostname string, from, to string, result map[string
 	}
 
 	if err = rows.Err(); err != nil {
-		return fmt.Errorf("处理内存信息记录时发生错误: %v", err)
+		return fmt.Errorf("处理cpu信息记录时发生错误: %v", err)
 	}
 
 	// 将过滤后的数据插入 result
@@ -428,9 +428,9 @@ func ReadCPUInfo(db *sql.DB, hostname string, from, to string, result map[string
 }
 func ReadNetInfo(db *sql.DB, hostname string, from, to string, result map[string]interface{}) error {
 	// 查询 JSON 数据
-	rows, err := db.Query(`SELECT id, network_info FROM system_info WHERE hostname = $1`, hostname)
+	rows, err := db.Query(`SELECT id, network_info FROM system_info WHERE host_name = $1`, hostname)
 	if err != nil {
-		return fmt.Errorf("查询内存信息时发生错误: %v", err)
+		return fmt.Errorf("查询net信息时发生错误: %v", err)
 	}
 	defer rows.Close()
 
@@ -444,7 +444,7 @@ func ReadNetInfo(db *sql.DB, hostname string, from, to string, result map[string
 		// 读取查询结果
 		err := rows.Scan(&id, &netJSON)
 		if err != nil {
-			return fmt.Errorf("扫描内存信息记录时发生错误: %v", err)
+			return fmt.Errorf("扫描net信息记录时发生错误: %v", err)
 		}
 
 		// 解析 JSON 数据（假设 mem_info 是一个 JSON 数组）
@@ -482,7 +482,7 @@ func ReadNetInfo(db *sql.DB, hostname string, from, to string, result map[string
 	}
 
 	if err = rows.Err(); err != nil {
-		return fmt.Errorf("处理内存信息记录时发生错误: %v", err)
+		return fmt.Errorf("处理net信息记录时发生错误: %v", err)
 	}
 
 	// 将过滤后的数据插入 result
@@ -492,9 +492,9 @@ func ReadNetInfo(db *sql.DB, hostname string, from, to string, result map[string
 }
 func ReadProcessInfo(db *sql.DB, hostname string, from, to string, result map[string]interface{}) error {
 	// 查询 JSON 数据
-	rows, err := db.Query(`SELECT id, process_info FROM system_info WHERE hostname = $1`, hostname)
+	rows, err := db.Query(`SELECT id, process_info FROM system_info WHERE host_name = $1`, hostname)
 	if err != nil {
-		return fmt.Errorf("查询内存信息时发生错误: %v", err)
+		return fmt.Errorf("查询进程信息时发生错误: %v", err)
 	}
 	defer rows.Close()
 
@@ -508,7 +508,7 @@ func ReadProcessInfo(db *sql.DB, hostname string, from, to string, result map[st
 		// 读取查询结果
 		err := rows.Scan(&id, &processJSON)
 		if err != nil {
-			return fmt.Errorf("扫描内存信息记录时发生错误: %v", err)
+			return fmt.Errorf("扫描进程信息记录时发生错误: %v", err)
 		}
 
 		// 解析 JSON 数据（假设 mem_info 是一个 JSON 数组）
@@ -546,7 +546,7 @@ func ReadProcessInfo(db *sql.DB, hostname string, from, to string, result map[st
 	}
 
 	if err = rows.Err(); err != nil {
-		return fmt.Errorf("处理内存信息记录时发生错误: %v", err)
+		return fmt.Errorf("处理进程信息记录时发生错误: %v", err)
 	}
 
 	// 将过滤后的数据插入 result
@@ -560,7 +560,7 @@ func ReadDB(db *sql.DB, queryType, from, to string, hostname string) (map[string
 
 	// 查询主机信息
 	if queryType == "host" || queryType == "all" {
-		row := db.QueryRow("SELECT id, hostname, os, platform, kernel_arch, host_info_created_at FROM host_info WHERE hostname = $1", hostname)
+		row := db.QueryRow("SELECT id, hostname, os, platform, kernel_arch, created_at FROM host_info WHERE hostname = $1", hostname)
 		var id int
 		var os, platform, kernelArch string
 		var createdAt time.Time
