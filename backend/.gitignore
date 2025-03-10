@@ -1,4 +1,4 @@
 *.exe
 *.sum
 *.yaml
-backend\server\config\configs\*.yaml
+config\configs\config.yaml
