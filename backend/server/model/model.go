@@ -721,7 +721,7 @@ func UpdateHostInfo(db *sql.DB, host_id int, host_info map[string]string) error 
 	}
 
 	_, err = db.Exec(
-	"UPDATE host_info SET hostname = $1, os = $2, platform = $3, kernel_arch = $4 WHERE host_id = $6",
+	"UPDATE host_info SET host_name = $1, os = $2, platform = $3, kernel_arch = $4 WHERE host_id = $6",
 		host_info["Hostname"], host_info["OS"], host_info["Platform"], host_info["KernelArch"], host_id,
 	)
 	if err != nil {
