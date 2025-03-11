@@ -1,15 +1,15 @@
 package model
 
 import (
-	"cmd/server/config"
-	"database/sql"
-	"encoding/json"
-	"fmt"
-	"log"
-	"time"
+"cmd/server/config"
+"database/sql"
+"encoding/json"
+"fmt"
+"log"
+"time"
 
-	"github.com/dgrijalva/jwt-go"
-	_ "github.com/lib/pq"
+"github.com/dgrijalva/jwt-go"
+_ "github.com/lib/pq"
 )
 
 // 连接数据库并创建表
@@ -675,12 +675,15 @@ func UpdateHostInfo(db *sql.DB, host_id int, host_info map[string]string) error 
 	//查看该主机的host_id是否存在
 	err := db.QueryRow("SELECT id FROM host_info WHERE host_id = ", host_id).Scan(&host_id)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to query host_info table: %v")
+	}
+	if err == sql.ErrNoRows {
+		return fmt.Errorf("no matching host_id found in host_info table")
 	}
 
 	_, err = db.Exec(
-		"UPDATE host_info SET host_name = $1, os = $2, platform = $3, kernel_arch = $4, updated_at = $5 WHERE host_id = $6",
-		host_info["Hostname"], host_info["OS"], host_info["Platform"], host_info["KernelArch"], time.Now(), host_id,
+	"UPDATE host_info SET hostname = $1, os = $2, platform = $3, kernel_arch = $4 WHERE host_id = $6",
+		host_info["Hostname"], host_info["OS"], host_info["Platform"], host_info["KernelArch"], host_id,
 	)
 	if err != nil {
 		return err
@@ -689,165 +692,169 @@ func UpdateHostInfo(db *sql.DB, host_id int, host_info map[string]string) error 
 }
 
 // 更新系统信息
-//func UpdateSystemInfo(db *sql.DB, hostInfoID int, cpuInfo []CPUInfo, memoryInfo MemoryInfo, processInfo ProcessInfo, networkInfo NetworkInfo) error {
-//	// 查询system_info表中的host_id是否存在
-//	var existingID int
-//	err := db.QueryRow("SELECT id FROM system_info WHERE host_info_id = $1", hostInfoID).Scan(&existingID)
-//	if err != nil {
-//		return fmt.Errorf("failed to query system_info table: %v", err)
-//	}
-//	if err == sql.ErrNoRows {
-//		return fmt.Errorf("no matching host_id found in system_info table")
-//	}
-//
-//	tx, err := db.Begin()
-//	if err != nil {
-//		return fmt.Errorf("failed to begin transaction: %v", err)
-//	}
-//
-//	// 获取当前时间并格式化
-//	currentTime := time.Now().UTC().Format(time.RFC3339)
-//
-//	// 删除超过7天的数据
-//	sevenDaysAgo := time.Now().UTC().AddDate(0, 0, -7).Format(time.RFC3339)
-//	deleteSQL := `
-//        UPDATE system_info
-//        SET cpu_info = jsonb_set(cpu_info, '{cpu_info}', (cpu_info->'cpu_info') - (SELECT jsonb_agg(key) FROM jsonb_each(cpu_info->'cpu_info') WHERE (value->>'time')::timestamp < $1),
-//            memory_info = jsonb_set(memory_info, '{memory_info}', (memory_info->'memory_info') - (SELECT jsonb_agg(key) FROM jsonb_each(memory_info->'memory_info') WHERE (value->>'time')::timestamp < $1),
-//            process_info = jsonb_set(process_info, '{process_info}', (process_info->'process_info') - (SELECT jsonb_agg(key) FROM jsonb_each(process_info->'process_info') WHERE (value->>'time')::timestamp < $1),
-//            network_info = jsonb_set(network_info, '{network_info}', (network_info->'network_info') - (SELECT jsonb_agg(key) FROM jsonb_each(network_info->'network_info') WHERE (value->>'time')::timestamp < $1)
-//        WHERE host_info_id = $2
-//    `
-//	_, err = tx.Exec(deleteSQL, sevenDaysAgo, hostInfoID)
-//	if err != nil {
-//		return err
-//	}
-//
-//	// 初始化 existingData
-//	existingData := make(map[string]json.RawMessage)
-//
-//	// 查询现有数据
-//	querySQL := `
-//		SELECT cpu_info, memory_info, process_info, network_info
-//		FROM system_info
-//		WHERE host_info_id = $1
-//	`
-//	var cpuInfoJSON, memoryInfoJSON, processInfoJSON, networkInfoJSON json.RawMessage
-//	err = tx.QueryRow(querySQL, hostInfoID).Scan(&cpuInfoJSON, &memoryInfoJSON, &processInfoJSON, &networkInfoJSON)
-//	if err != nil && err != sql.ErrNoRows {
-//		return err
-//	}
-//
-//	// 将查询结果赋值给 existingData
-//	existingData["cpu_info"] = cpuInfoJSON
-//	existingData["memory_info"] = memoryInfoJSON
-//	existingData["process_info"] = processInfoJSON
-//	existingData["network_info"] = networkInfoJSON
-//
-//	// 处理 CPU 信息
-//	if cpuInfo != nil {
-//		var cpuInfoArray []CPUData
-//		if existingData["cpu_info"] != nil {
-//			if err := json.Unmarshal(existingData["cpu_info"], &cpuInfoArray); err != nil {
-//				return err
-//			}
-//		}
-//		cpuData := CPUData{
-//			Time: currentTime,
-//			Data: *cpuInfo,
-//		}
-//		cpuInfoArray = append(cpuInfoArray, cpuData)
-//		cpuInfoJSON, err := json.Marshal(cpuInfoArray)
-//		if err != nil {
-//			tx.Rollback()
-//			return err
-//		}
-//		existingData["cpu_info"] = cpuInfoJSON
-//	}
-//
-//	// 处理 Memory 信息
-//	if memoryInfo != nil {
-//		var memoryInfoArray []MemoryData
-//		if existingData["memory_info"] != nil {
-//			if err := json.Unmarshal(existingData["memory_info"], &memoryInfoArray); err != nil {
-//				return err
-//			}
-//		}
-//		memoryData := MemoryData{
-//			Time: currentTime,
-//			Data: *memoryInfo,
-//		}
-//		memoryInfoArray = append(memoryInfoArray, memoryData)
-//		memoryInfoJSON, err := json.Marshal(memoryInfoArray)
-//		if err != nil {
-//			tx.Rollback()
-//			return err
-//		}
-//		existingData["memory_info"] = memoryInfoJSON
-//	}
-//
-//	// 处理 Process 信息
-//	if processInfo != nil {
-//		var processInfoArray []ProcessData
-//		if existingData["process_info"] != nil {
-//			if err := json.Unmarshal(existingData["process_info"], &processInfoArray); err != nil {
-//				return err
-//			}
-//		}
-//		processData := ProcessData{
-//			Time: currentTime,
-//			Data: *processInfo,
-//		}
-//		processInfoArray = append(processInfoArray, processData)
-//		processInfoJSON, err := json.Marshal(processInfoArray)
-//		if err != nil {
-//			tx.Rollback()
-//			return err
-//		}
-//		existingData["process_info"] = processInfoJSON
-//	}
-//
-//	// 处理 Network 信息
-//	if networkInfo != nil {
-//		var networkInfoArray []NetworkData
-//		if existingData["network_info"] != nil {
-//			if err := json.Unmarshal(existingData["network_info"], &networkInfoArray); err != nil {
-//				return err
-//			}
-//		}
-//		networkData := NetworkData{
-//			Time: currentTime,
-//			Data: *networkInfo,
-//		}
-//		networkInfoArray = append(networkInfoArray, networkData)
-//		networkInfoJSON, err := json.Marshal(networkInfoArray)
-//		if err != nil {
-//			tx.Rollback()
-//			return err
-//		}
-//		existingData["network_info"] = networkInfoJSON
-//	}
-//
-//	// 更新数据库
-//	updateSQL := `
-//        UPDATE system_info
-//        SET cpu_info = COALESCE($1, cpu_info),
-//            memory_info = COALESCE($2, memory_info),
-//            process_info = COALESCE($3, process_info),
-//            network_info = COALESCE($4, network_info),
-//        WHERE host_info_id = $5
-//    `
-//	_, err = tx.Exec(updateSQL, existingData["cpu_info"], existingData["memory_info"], existingData["process_info"], existingData["network_info"], hostInfoID)
-//	if err != nil {
-//		tx.Rollback()
-//		return err
-//	}
-//
-//	return nil
-//}
+func UpdateSystemInfo(db *sql.DB, hostInfoID int, cpuInfo []CPUInfo, memoryInfo MemoryInfo, processInfo ProcessInfo, networkInfo NetworkInfo) error {
+	// 查询system_info表中的host_id是否存在
+	var existingID int
+	err := db.QueryRow("SELECT id FROM system_info WHERE host_info_id = $1", hostInfoID).Scan(&existingID)
+	if err != nil {
+		return fmt.Errorf("failed to query system_info table: %v", err)
+	}
+	if err == sql.ErrNoRows {
+		return fmt.Errorf("no matching host_id found in system_info table")
+	}
 
-// 更新token表
-func UpdateToken(db *sql.DB, hostName string, token string, lastHeartBeat time.Time, status string) error {
+	tx,err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %v", err)
+	}
+
+	// 获取当前时间并格式化
+	currentTime := time.Now().UTC().Format(time.RFC3339)
+
+	// 删除超过7天的数据
+	sevenDaysAgo := time.Now().UTC().AddDate(0, 0, -7).Format(time.RFC3339)
+	deleteSQL := `
+        UPDATE system_info
+        SET cpu_info = (SELECT jsonb_agg(elem) FROM jsonb_array_elements(cpu_info) AS elem WHERE (elem->>'time')::timestamp >= $1),
+            memory_info = (SELECT jsonb_agg(elem) FROM jsonb_array_elements(memory_info) AS elem WHERE (elem->>'time')::timestamp >= $1),
+            process_info = (SELECT jsonb_agg(elem) FROM jsonb_array_elements(process_info) AS elem WHERE (elem->>'time')::timestamp >= $1),
+            network_info = (SELECT jsonb_agg(elem) FROM jsonb_array_elements(network_info) AS elem WHERE (elem->>'time')::timestamp >= $1)
+        WHERE host_info_id = $2
+    `
+	_, err = tx.Exec(deleteSQL, sevenDaysAgo, hostInfoID)
+	if err != nil {
+		return err
+	}
+
+	// 初始化 existingData
+	existingData := make(map[string]json.RawMessage)
+
+	// 查询现有数据
+	querySQL := `
+		SELECT cpu_info, memory_info, process_info, network_info
+		FROM system_info
+		WHERE host_info_id = $1
+	`
+	var cpuInfoJSON, memoryInfoJSON, processInfoJSON, networkInfoJSON json.RawMessage
+	err = tx.QueryRow(querySQL, hostInfoID).Scan(&cpuInfoJSON, &memoryInfoJSON, &processInfoJSON, &networkInfoJSON)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+
+	// 将查询结果赋值给 existingData
+	existingData["cpu_info"] = cpuInfoJSON
+	existingData["memory_info"] = memoryInfoJSON
+	existingData["process_info"] = processInfoJSON
+	existingData["network_info"] = networkInfoJSON
+
+	//处理cpu
+	if len(cpuInfo) > 0 {
+		var cpuInfoArray []CPUData
+		if existingData["cpu_info"] != nil {
+			if err := json.Unmarshal(existingData["cpu_info"], &cpuInfoArray); err != nil {
+				return err
+			}
+		}
+
+		// 遍历 cpuInfo 切片，创建新的 CPUData 实例
+		cpuData := CPUData{
+			Time: currentTime,
+			Data: cpuInfo,
+		}
+		cpuInfoArray = append(cpuInfoArray, cpuData)
+
+		// 序列化更新后的 CPUInfoArray
+		cpuInfoJSON, err := json.Marshal(cpuInfoArray)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+		existingData["cpu_info"] = cpuInfoJSON
+	}
+
+	// 处理 Memory 信息
+	if memoryInfo != (MemoryInfo{}) {
+		var memoryInfoArray []MemoryData
+		if existingData["memory_info"] != nil {
+			if err := json.Unmarshal(existingData["memory_info"], &memoryInfoArray); err != nil {
+				return err
+			}
+		}
+		memoryData := MemoryData{
+			Time: currentTime,
+			Data: memoryInfo,
+		}
+		memoryInfoArray = append(memoryInfoArray, memoryData)
+		memoryInfoJSON, err := json.Marshal(memoryInfoArray)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+		existingData["memory_info"] = memoryInfoJSON
+	}
+
+	// 处理 Process 信息
+	if processInfo != (ProcessInfo{}) {
+		var processInfoArray []ProcessData
+		if existingData["process_info"] != nil {
+			if err := json.Unmarshal(existingData["process_info"], &processInfoArray); err != nil {
+				return err
+			}
+		}
+		processData := ProcessData{
+			Time: currentTime,
+			Data: processInfo,
+		}
+		processInfoArray = append(processInfoArray, processData)
+		processInfoJSON, err := json.Marshal(processInfoArray)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+		existingData["process_info"] = processInfoJSON
+	}
+
+	// 处理 Network 信息
+	if networkInfo != (NetworkInfo{}) {
+		var networkInfoArray []NetworkData
+		if existingData["network_info"] != nil {
+			if err := json.Unmarshal(existingData["network_info"], &networkInfoArray); err != nil {
+				return err
+			}
+		}
+		networkData := NetworkData{
+			Time: currentTime,
+			Data: networkInfo,
+		}
+		networkInfoArray = append(networkInfoArray, networkData)
+		networkInfoJSON, err := json.Marshal(networkInfoArray)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+		existingData["network_info"] = networkInfoJSON
+	}
+
+	// 更新数据库
+	updateSQL := `
+        UPDATE system_info
+        SET cpu_info = COALESCE($1, cpu_info),
+            memory_info = COALESCE($2, memory_info),
+            process_info = COALESCE($3, process_info),
+            network_info = COALESCE($4, network_info),
+        WHERE host_info_id = $5
+    `
+	_, err = tx.Exec(updateSQL, existingData["cpu_info"], existingData["memory_info"], existingData["process_info"], existingData["network_info"], hostInfoID)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return nil
+}
+
+//更新token表
+func UpdateToken(db *sql.DB,hostName string, token string,lastHeartBeat time.Time ,status string) error {
 	//判断hostandtoken表是否存在该hostname
 	var existingName string
 	err := db.QueryRow("SELECT hos_tname FROM hostandtoken WHERE host_name = ", hostName).Scan(&existingName)
