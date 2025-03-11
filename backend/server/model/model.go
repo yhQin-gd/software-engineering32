@@ -55,43 +55,43 @@ type HostInfo struct {
 }
 
 type CPUInfo struct {
-	ID        int       `json:"id"` // 添加 ID 字段
-	ModelName string    `json:"model_name"`
-	CoresNum  int       `json:"cores_num"`
-	Percent   float64   `json:"percent"`
-	CreatedAt time.Time `json:"cpu_info_created_at"` // 添加 CreatedAt 字段
+	ID        int     `json:"id"` // 添加 ID 字段
+	ModelName string  `json:"model_name"`
+	CoresNum  int     `json:"cores_num"`
+	Percent   float64 `json:"percent"`
+	// CreatedAt time.Time `json:"cpu_info_created_at"` // 添加 CreatedAt 字段
 }
 
 type ProcessInfo struct {
-	ID         int       `json:"id"` // 添加 ID 字段
-	PID        int       `json:"pid"`
-	CPUPercent float64   `json:"cpu_percent"`
-	MemPercent float64   `json:"mem_percent"`
-	Cmdline    string    `json:"cmdline"`
-	CreatedAt  time.Time `json:"pro_info_created_at"` // 添加 CreatedAt 字段
+	ID         int     `json:"id"` // 添加 ID 字段
+	PID        int     `json:"pid"`
+	CPUPercent float64 `json:"cpu_percent"`
+	MemPercent float64 `json:"mem_percent"`
+	Cmdline    string  `json:"cmdline"`
+	// CreatedAt  time.Time `json:"pro_info_created_at"` // 添加 CreatedAt 字段
 }
 
 type MemoryInfo struct {
-	ID          int       `json:"id"` // 添加 ID 字段
-	Total       string    `json:"total"`
-	Available   string    `json:"available"`
-	Used        string    `json:"used"`
-	Free        string    `json:"free"`
-	UserPercent float64   `json:"user_percent"`
-	CreatedAt   time.Time `json:"mem_info_created_at"` // 添加 CreatedAt 字段
+	ID          int     `json:"id"` // 添加 ID 字段
+	Total       string  `json:"total"`
+	Available   string  `json:"available"`
+	Used        string  `json:"used"`
+	Free        string  `json:"free"`
+	UserPercent float64 `json:"user_percent"`
+	// CreatedAt   time.Time `json:"mem_info_created_at"` // 添加 CreatedAt 字段
 }
 
 // 定义网络信息结构体
 type NetworkInfo struct {
-	ID        int       `json:"id"`
-	Name      string    `json:"name"`
-	BytesRecv uint64    `json:"bytes_recv"` // 接收字节数
-	BytesSent uint64    `json:"bytes_sent"` // 发送字节数
-	CreatedAt time.Time `json:"net_info_created_at"`
+	ID        int    `json:"id"`
+	Name      string `json:"name"`
+	BytesRecv uint64 `json:"bytes_recv"` // 接收字节数
+	BytesSent uint64 `json:"bytes_sent"` // 发送字节数
+	// CreatedAt time.Time `json:"net_info_created_at"`
 }
 
 type CPUData struct {
-	Time string  `json:"time"`
+	Time string    `json:"time"`
 	Data []CPUInfo `json:"data"`
 }
 
@@ -158,7 +158,7 @@ func InsertHostInfo(db *sql.DB, hostInfo HostInfo, username string) error {
 	return nil
 }
 
-func InsertSystemInfo(db *sql.DB, hostInfoID int, hostname string, cpuInfo CPUInfo, memoryInfo MemoryInfo, processInfo ProcessInfo, networkInfo NetworkInfo) error {
+func InsertSystemInfo(db *sql.DB, hostInfoID int, hostname string, cpuInfo []CPUInfo, memoryInfo MemoryInfo, processInfo ProcessInfo, networkInfo NetworkInfo) error {
 	// 检查是否已经存在对应的 system_info 记录
 	var existingID int
 	var cpuInfoJSON, memoryInfoJSON, processInfoJSON, networkInfoJSON []byte
@@ -174,7 +174,12 @@ func InsertSystemInfo(db *sql.DB, hostInfoID int, hostname string, cpuInfo CPUIn
 	if err != nil && err != sql.ErrNoRows {
 		return fmt.Errorf("failed to query system_info: %v", err)
 	}
+	fmt.Println("InsertSystemInfo : existingID 为", existingID)
 
+	if existingID > 0 {
+		//UpdateSystemInfo(db, hostInfoID, cpuInfo, memoryInfo, processInfo, networkInfo)
+		return nil
+	}
 	// 获取当前时间并格式化
 	currentTime := time.Now().UTC().Format(time.RFC3339)
 
@@ -250,33 +255,33 @@ func InsertSystemInfo(db *sql.DB, hostInfoID int, hostname string, cpuInfo CPUIn
 		return fmt.Errorf("failed to marshal updated network_info: %v", err)
 	}
 
-	if existingID > 0 {
-		// 更新现有记录
-		_, err = db.Exec(`
-		UPDATE system_info
-		SET cpu_info = $1,
-		    memory_info = $2,
-		    process_info = $3,
-		    network_info = $4,
-		    created_at = CURRENT_TIMESTAMP
-		WHERE id = $5`,
-			cpuInfoData, memoryInfoData, processInfoData, networkInfoData, existingID)
-		if err != nil {
-			return fmt.Errorf("failed to update system_info: %v", err)
-		}
-		fmt.Println("Updated existing system_info successfully")
-	} else {
-		// 插入新的记录
-		insertSQL := `
+	// if existingID > 0 {
+	// // 	// 更新现有记录
+	// 	// _, err = db.Exec(`
+	// 	// UPDATE system_info
+	// 	// SET cpu_info = $1,
+	// 	//     memory_info = $2,
+	// 	//     process_info = $3,
+	// 	//     network_info = $4,
+	// 	//     created_at = CURRENT_TIMESTAMP
+	// 	// WHERE id = $5`,
+	// 	// 	cpuInfoData, memoryInfoData, processInfoData, networkInfoData, existingID)
+	// 	// if err != nil {
+	// 	// 	return fmt.Errorf("failed to update system_info: %v", err)
+	// 	// }
+	// 	// fmt.Println("Updated existing system_info successfully")
+	// } else {
+	// 插入新的记录
+	insertSQL := `
 		INSERT INTO system_info (host_info_id, host_name,cpu_info, memory_info, process_info, network_info, created_at)
 		VALUES ($1, $2, $3, $4, $5,$6 ,CURRENT_TIMESTAMP)`
 
-		_, err := db.Exec(insertSQL, hostInfoID, hostname, cpuInfoData, memoryInfoData, processInfoData, networkInfoData)
-		if err != nil {
-			return fmt.Errorf("failed to insert system_info: %v", err)
-		}
-		fmt.Println("Inserted new system_info successfully")
+	_, err = db.Exec(insertSQL, hostInfoID, hostname, cpuInfoData, memoryInfoData, processInfoData, networkInfoData)
+	if err != nil {
+		return fmt.Errorf("failed to insert system_info: %v", err)
 	}
+	fmt.Println("Inserted new system_info successfully")
+	// }
 
 	return nil
 }
@@ -298,6 +303,7 @@ func InsertHostandToken(db *sql.DB, UserName string, Token string) error {
 
 	return nil
 }
+
 func ReadMemoryInfo(db *sql.DB, hostname string, from, to string, result map[string]interface{}) error {
 	// 查询 JSON 数据
 	rows, err := db.Query(`SELECT id, memory_info FROM system_info WHERE host_name = $1`, hostname)
@@ -328,7 +334,7 @@ func ReadMemoryInfo(db *sql.DB, hostname string, from, to string, result map[str
 		// 遍历 JSON 数组中的每个时间点数据
 		for _, memInfo := range memInfos {
 			// 获取 updated_at 字段
-			updatedAtStr, ok := memInfo["updated_at"].(string)
+			updatedAtStr, ok := memInfo["time"].(string)
 			if !ok {
 				continue // 如果 updated_at 字段不存在或类型错误，跳过该记录
 			}
@@ -356,6 +362,7 @@ func ReadMemoryInfo(db *sql.DB, hostname string, from, to string, result map[str
 	if err = rows.Err(); err != nil {
 		return fmt.Errorf("处理内存信息记录时发生错误: %v", err)
 	}
+	fmt.Println(memoryData)
 
 	// 将过滤后的数据插入 result
 	result["memory"] = memoryData
@@ -392,7 +399,7 @@ func ReadCPUInfo(db *sql.DB, hostname string, from, to string, result map[string
 		// 遍历 JSON 数组中的每个时间点数据
 		for _, memInfo := range cpuInfos {
 			// 获取 updated_at 字段
-			updatedAtStr, ok := memInfo["updated_at"].(string)
+			updatedAtStr, ok := memInfo["time"].(string)
 			if !ok {
 				continue // 如果 updated_at 字段不存在或类型错误，跳过该记录
 			}
@@ -456,7 +463,7 @@ func ReadNetInfo(db *sql.DB, hostname string, from, to string, result map[string
 		// 遍历 JSON 数组中的每个时间点数据
 		for _, netInfo := range netInfos {
 			// 获取 updated_at 字段
-			updatedAtStr, ok := netInfo["updated_at"].(string)
+			updatedAtStr, ok := netInfo["time"].(string)
 			if !ok {
 				continue // 如果 updated_at 字段不存在或类型错误，跳过该记录
 			}
@@ -520,7 +527,7 @@ func ReadProcessInfo(db *sql.DB, hostname string, from, to string, result map[st
 		// 遍历 JSON 数组中的每个时间点数据
 		for _, processInfo := range processInfos {
 			// 获取 updated_at 字段
-			updatedAtStr, ok := processInfo["updated_at"].(string)
+			updatedAtStr, ok := processInfo["time"].(string)
 			if !ok {
 				continue // 如果 updated_at 字段不存在或类型错误，跳过该记录
 			}
@@ -657,8 +664,7 @@ func DeleteDB(db *sql.DB, host_id int) error {
 	return nil
 }
 
-
-//更新主机信息
+// 更新主机信息
 func UpdateHostInfo(db *sql.DB, host_id int, host_info map[string]string) error {
 
 	//查看该主机的host_id是否存在
@@ -736,27 +742,7 @@ func UpdateSystemInfo(db *sql.DB, hostInfoID int, cpuInfo []CPUInfo, memoryInfo 
 	existingData["process_info"] = processInfoJSON
 	existingData["network_info"] = networkInfoJSON
 
-    // 处理 CPU 信息
-   /*  if cpuInfo != (CPUInfo{}){
-        var cpuInfoArray []CPUData
-        if existingData["cpu_info"] != nil {
-            if err := json.Unmarshal(existingData["cpu_info"], &cpuInfoArray); err != nil {
-                return err
-            }
-        }
-        cpuData := CPUData{
-            Time: currentTime,
-            Data: cpuInfo,
-        }
-        cpuInfoArray = append(cpuInfoArray, cpuData)
-        cpuInfoJSON, err := json.Marshal(cpuInfoArray)
-        if err != nil {
-			tx.Rollback()
-            return err
-        }
-        existingData["cpu_info"] = cpuInfoJSON
-    } */
-
+	//处理cpu
 	if len(cpuInfo) > 0 {
 		var cpuInfoArray []CPUData
 		if existingData["cpu_info"] != nil {
@@ -880,4 +866,3 @@ func UpdateToken(db *sql.DB,hostName string, token string,lastHeartBeat time.Tim
 	}
 	return nil
 }
-
