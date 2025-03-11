@@ -39,7 +39,7 @@ func InstallAgent(c *gin.Context) {
 
 	// 检查数据库中是否存在相同的 host_name
 	var exists bool
-	query := `SELECT EXISTS (SELECT 1 FROM host_info WHERE hostname = $1)`
+	query := `SELECT EXISTS (SELECT 1 FROM host_info WHERE host_name = $1)`
 	err = db.QueryRow(query, agentInfo.Host_Name).Scan(&exists)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": "Failed to check host_name in database"})
