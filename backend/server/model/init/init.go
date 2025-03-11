@@ -2,10 +2,12 @@ package init
 
 import (
 	"fmt"
+	"os"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"os"
+
 )
+
 
 const createTableSQL = `
 -- roles 表
@@ -22,14 +24,14 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR UNIQUE NOT NULL,
     password VARCHAR NOT NULL,
     isverified BOOLEAN DEFAULT FALSE,
-    role_id INT ,
+    role_id INT REFERENCES roles(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- host表
 CREATE TABLE IF NOT EXISTS host_info (
 	id SERIAL PRIMARY KEY,
-    user_name VARCHAR ,
+    user_name VARCHAR, -- REFERENCES users(name),
 	hostname VARCHAR(255)  UNIQUE,
 	os TEXT NOT NULL,
 	platform TEXT NOT NULL,
@@ -40,8 +42,8 @@ CREATE TABLE IF NOT EXISTS host_info (
 -- system_info表
 CREATE TABLE IF NOT EXISTS system_info (
 	id SERIAL PRIMARY KEY,
-	host_info_id INT ,
-	host_name VARCHAR(255) ,
+	host_info_id INT, -- REFERENCES host_info(id),
+	host_name VARCHAR(255), -- REFERENCES host_info(hostname),
 	cpu_info JSONB,
 	memory_info JSONB,
 	process_info JSONB,
@@ -52,14 +54,14 @@ CREATE TABLE IF NOT EXISTS system_info (
 -- token表
 CREATE TABLE IF NOT EXISTS hostandtoken (
 	id SERIAL PRIMARY KEY,
-	host_name VARCHAR(255) ,
+	host_name VARCHAR(255) , -- REFERENCES host_info(hostname),
 	token TEXT NOT NULL,
 	last_heartbeat TIMESTAMP DEFAULT NOW(),
 	status VARCHAR(10) DEFAULT 'offline'
 );
 
 -- 在system_info表的host_info_id字段上创建索引，加速通过主机ID查找系统信息
-CREATE INDEX IF NOT EXISTS idx_system_info_host_info_id ON system_info(host_info_id);
+-- CREATE INDEX IF NOT EXISTS idx_system_info_host_info_id ON system_info(host_info_id);
 
 -- 对于system_info表中的JSONB字段(cpu_info, memory_info等)，如果需要根据某些键值进行查询，
 -- 可以考虑创建GIN (Generalized Inverted Index) 索引，例如：
@@ -83,7 +85,6 @@ CREATE INDEX IF NOT EXISTS idx_hostandtoken_last_heartbeat ON hostandtoken(last_
 //                 "model_name": "Intel Xeon E5-2678 v3",
 //                 "cores_num": 12,
 //                 "percent": 45.7,
-//                 "cpu_info_created_at": "2023-10-10T12:34:56Z",
 //                 "updated_at": "2023-10-10T12:34:56Z"
 //             }
 //         },
@@ -94,7 +95,6 @@ CREATE INDEX IF NOT EXISTS idx_hostandtoken_last_heartbeat ON hostandtoken(last_
 //                 "model_name": "Intel Xeon E5-2678 v3",
 //                 "cores_num": 12,
 //                 "percent": 50.2,
-//                 "cpu_info_created_at": "2023-10-10T12:35:56Z",
 //                 "updated_at": "2023-10-10T12:35:56Z"
 //             }
 //         }
@@ -146,6 +146,7 @@ func InitDB() error {
 	return nil
 }
 
+
 // -- cpu表
 // CREATE TABLE IF NOT EXISTS cpu_info (
 // 	id SERIAL PRIMARY KEY,
@@ -165,7 +166,7 @@ func InitDB() error {
 // 	used NUMERIC(10,2) NOT NULL,
 // 	free NUMERIC(10,2) NOT NULL,
 // 	user_percent NUMERIC(5,2) NOT NULL,
-// 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+// 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP 
 // );
 
 // -- process 表
