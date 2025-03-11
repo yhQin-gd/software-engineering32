@@ -92,7 +92,7 @@ type NetworkInfo struct {
 
 type CPUData struct {
 	Time string  `json:"time"`
-	Data CPUInfo `json:"data"`
+	Data []CPUInfo `json:"data"`
 }
 
 type MemoryData struct {
@@ -681,7 +681,7 @@ func UpdateHostInfo(db *sql.DB, host_id int, host_info map[string]string) error 
 }
 
 // 更新系统信息
-func UpdateSystemInfo(db *sql.DB, hostInfoID int, cpuInfo CPUInfo, memoryInfo MemoryInfo, processInfo ProcessInfo, networkInfo NetworkInfo) error {
+func UpdateSystemInfo(db *sql.DB, hostInfoID int, cpuInfo []CPUInfo, memoryInfo MemoryInfo, processInfo ProcessInfo, networkInfo NetworkInfo) error {
     // 查询system_info表中的host_id是否存在
 	var existingID int
 	err := db.QueryRow("SELECT id FROM system_info WHERE host_info_id = $1", hostInfoID).Scan(&existingID)
@@ -737,7 +737,7 @@ func UpdateSystemInfo(db *sql.DB, hostInfoID int, cpuInfo CPUInfo, memoryInfo Me
 	existingData["network_info"] = networkInfoJSON
 
     // 处理 CPU 信息
-    if cpuInfo != (CPUInfo{}){
+   /*  if cpuInfo != (CPUInfo{}){
         var cpuInfoArray []CPUData
         if existingData["cpu_info"] != nil {
             if err := json.Unmarshal(existingData["cpu_info"], &cpuInfoArray); err != nil {
@@ -755,7 +755,31 @@ func UpdateSystemInfo(db *sql.DB, hostInfoID int, cpuInfo CPUInfo, memoryInfo Me
             return err
         }
         existingData["cpu_info"] = cpuInfoJSON
-    }
+    } */
+
+	if len(cpuInfo) > 0 {
+		var cpuInfoArray []CPUData
+		if existingData["cpu_info"] != nil {
+			if err := json.Unmarshal(existingData["cpu_info"], &cpuInfoArray); err != nil {
+				return err
+			}
+		}
+	
+		// 遍历 cpuInfo 切片，创建新的 CPUData 实例
+		cpuData := CPUData{
+			Time: currentTime,
+			Data: cpuInfo, 
+		}
+		cpuInfoArray = append(cpuInfoArray, cpuData)
+	
+		// 序列化更新后的 CPUInfoArray
+		cpuInfoJSON, err := json.Marshal(cpuInfoArray)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+		existingData["cpu_info"] = cpuInfoJSON
+	}
 
     // 处理 Memory 信息
     if memoryInfo != (MemoryInfo{}) {
