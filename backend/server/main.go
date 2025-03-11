@@ -23,7 +23,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("加载配置失败: %v", err)
 	}
-	
+
 	fmt.Println("-----------------------")
 	//设置数据库连接的环境变量
 	os.Setenv("DB_USER", config.DB.User)
@@ -49,7 +49,7 @@ func main() {
 	}
 	// 初始化数据库数据
 	if err := db.InitDBData(); err!= nil {
-		log.Fatalf("Failed to initialize data: %v", err)		
+		log.Fatalf("Failed to initialize data: %v", err)
 	}
 
 	// 注册 Swagger 路由
@@ -63,7 +63,7 @@ func main() {
 		auth.POST("/install", install.InstallAgent)
 		auth.POST("/addSystemInfo", monitor.ReceiveAndStoreSystemMetrics)
 		auth.GET("/list", monitor.ListAgent)
-		auth.GET("/agentInfo/:host_name", monitor.GetAgentInfo)	
+		router.GET("/monitor/:hostname", monitor.GetAgentInfo)
 	}
 	router.Run("0.0.0.0:8080")
 }
