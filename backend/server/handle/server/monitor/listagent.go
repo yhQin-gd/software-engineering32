@@ -56,7 +56,7 @@ func ListAgent(c *gin.Context) {
 
 	// 查询数据库，过滤出当前用户的主机
 	query := `
-		SELECT id, hostname, os, platform, kernel_arch, created_at
+		SELECT id, host_name, os, platform, kernel_arch, created_at
 		FROM host_info
 		WHERE user_name = $1 AND created_at BETWEEN $2 AND $3
 	`
