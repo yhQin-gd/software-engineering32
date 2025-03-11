@@ -328,7 +328,7 @@ func ReadMemoryInfo(db *sql.DB, hostname string, from, to string, result map[str
 		// 遍历 JSON 数组中的每个时间点数据
 		for _, memInfo := range memInfos {
 			// 获取 updated_at 字段
-			updatedAtStr, ok := memInfo["updated_at"].(string)
+			updatedAtStr, ok := memInfo["time"].(string)
 			if !ok {
 				continue // 如果 updated_at 字段不存在或类型错误，跳过该记录
 			}
@@ -392,7 +392,7 @@ func ReadCPUInfo(db *sql.DB, hostname string, from, to string, result map[string
 		// 遍历 JSON 数组中的每个时间点数据
 		for _, memInfo := range cpuInfos {
 			// 获取 updated_at 字段
-			updatedAtStr, ok := memInfo["updated_at"].(string)
+			updatedAtStr, ok := memInfo["time"].(string)
 			if !ok {
 				continue // 如果 updated_at 字段不存在或类型错误，跳过该记录
 			}
@@ -456,7 +456,7 @@ func ReadNetInfo(db *sql.DB, hostname string, from, to string, result map[string
 		// 遍历 JSON 数组中的每个时间点数据
 		for _, netInfo := range netInfos {
 			// 获取 updated_at 字段
-			updatedAtStr, ok := netInfo["updated_at"].(string)
+			updatedAtStr, ok := netInfo["time"].(string)
 			if !ok {
 				continue // 如果 updated_at 字段不存在或类型错误，跳过该记录
 			}
@@ -520,7 +520,7 @@ func ReadProcessInfo(db *sql.DB, hostname string, from, to string, result map[st
 		// 遍历 JSON 数组中的每个时间点数据
 		for _, processInfo := range processInfos {
 			// 获取 updated_at 字段
-			updatedAtStr, ok := processInfo["updated_at"].(string)
+			updatedAtStr, ok := processInfo["time"].(string)
 			if !ok {
 				continue // 如果 updated_at 字段不存在或类型错误，跳过该记录
 			}
