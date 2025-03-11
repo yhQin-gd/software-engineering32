@@ -57,7 +57,7 @@ func main() {
 		auth.POST("/install", install.InstallAgent)
 		auth.POST("/system_info", monitor.ReceiveAndStoreSystemMetrics)
 		auth.GET("/list", monitor.ListAgent)
-		router.GET("/agent/:hostname", monitor.GetAgentInfo)
+		router.GET("/monitor/:hostname", monitor.GetAgentInfo)
 	}
 	router.Run("0.0.0.0:8080")
 }
