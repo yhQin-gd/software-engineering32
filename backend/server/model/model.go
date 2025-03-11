@@ -664,12 +664,15 @@ func UpdateHostInfo(db *sql.DB, host_id int, host_info map[string]string) error 
 	//查看该主机的host_id是否存在
 	err := db.QueryRow("SELECT id FROM host_info WHERE host_id = ", host_id).Scan(&host_id)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to query host_info table: %v")
+	}
+	if err == sql.ErrNoRows {
+		return fmt.Errorf("no matching host_id found in host_info table")
 	}
 
 	_, err = db.Exec(
-		"UPDATE host_info SET hostname = $1, os = $2, platform = $3, kernel_arch = $4, updated_at = $5 WHERE host_id = $6",
-		host_info["Hostname"], host_info["OS"], host_info["Platform"], host_info["KernelArch"], time.Now(), host_id,
+		"UPDATE host_info SET hostname = $1, os = $2, platform = $3, kernel_arch = $4 WHERE host_id = $6",
+		host_info["Hostname"], host_info["OS"], host_info["Platform"], host_info["KernelArch"], host_id,
 	)
 	if err != nil {
 		return err
@@ -678,7 +681,7 @@ func UpdateHostInfo(db *sql.DB, host_id int, host_info map[string]string) error 
 }
 
 // 更新系统信息
-func UpdateSystemInfo(db *sql.DB, hostInfoID int, cpuInfo *CPUInfo, memoryInfo *MemoryInfo, processInfo *ProcessInfo, networkInfo *NetworkInfo) error {
+func UpdateSystemInfo(db *sql.DB, hostInfoID int, cpuInfo CPUInfo, memoryInfo MemoryInfo, processInfo ProcessInfo, networkInfo NetworkInfo) error {
     // 查询system_info表中的host_id是否存在
 	var existingID int
 	err := db.QueryRow("SELECT id FROM system_info WHERE host_info_id = $1", hostInfoID).Scan(&existingID)
@@ -701,10 +704,10 @@ func UpdateSystemInfo(db *sql.DB, hostInfoID int, cpuInfo *CPUInfo, memoryInfo *
     sevenDaysAgo := time.Now().UTC().AddDate(0, 0, -7).Format(time.RFC3339)
     deleteSQL := `
         UPDATE system_info
-        SET cpu_info = jsonb_set(cpu_info, '{cpu_info}', (cpu_info->'cpu_info') - (SELECT jsonb_agg(key) FROM jsonb_each(cpu_info->'cpu_info') WHERE (value->>'time')::timestamp < $1),
-            memory_info = jsonb_set(memory_info, '{memory_info}', (memory_info->'memory_info') - (SELECT jsonb_agg(key) FROM jsonb_each(memory_info->'memory_info') WHERE (value->>'time')::timestamp < $1),
-            process_info = jsonb_set(process_info, '{process_info}', (process_info->'process_info') - (SELECT jsonb_agg(key) FROM jsonb_each(process_info->'process_info') WHERE (value->>'time')::timestamp < $1),
-            network_info = jsonb_set(network_info, '{network_info}', (network_info->'network_info') - (SELECT jsonb_agg(key) FROM jsonb_each(network_info->'network_info') WHERE (value->>'time')::timestamp < $1)
+        SET cpu_info = (SELECT jsonb_agg(elem) FROM jsonb_array_elements(cpu_info) AS elem WHERE (elem->>'time')::timestamp >= $1),
+            memory_info = (SELECT jsonb_agg(elem) FROM jsonb_array_elements(memory_info) AS elem WHERE (elem->>'time')::timestamp >= $1),
+            process_info = (SELECT jsonb_agg(elem) FROM jsonb_array_elements(process_info) AS elem WHERE (elem->>'time')::timestamp >= $1),
+            network_info = (SELECT jsonb_agg(elem) FROM jsonb_array_elements(network_info) AS elem WHERE (elem->>'time')::timestamp >= $1)
         WHERE host_info_id = $2
     `
     _, err = tx.Exec(deleteSQL, sevenDaysAgo, hostInfoID)
@@ -734,7 +737,7 @@ func UpdateSystemInfo(db *sql.DB, hostInfoID int, cpuInfo *CPUInfo, memoryInfo *
 	existingData["network_info"] = networkInfoJSON
 
     // 处理 CPU 信息
-    if cpuInfo != nil {
+    if cpuInfo != (CPUInfo{}){
         var cpuInfoArray []CPUData
         if existingData["cpu_info"] != nil {
             if err := json.Unmarshal(existingData["cpu_info"], &cpuInfoArray); err != nil {
@@ -743,7 +746,7 @@ func UpdateSystemInfo(db *sql.DB, hostInfoID int, cpuInfo *CPUInfo, memoryInfo *
         }
         cpuData := CPUData{
             Time: currentTime,
-            Data: *cpuInfo,
+            Data: cpuInfo,
         }
         cpuInfoArray = append(cpuInfoArray, cpuData)
         cpuInfoJSON, err := json.Marshal(cpuInfoArray)
@@ -755,7 +758,7 @@ func UpdateSystemInfo(db *sql.DB, hostInfoID int, cpuInfo *CPUInfo, memoryInfo *
     }
 
     // 处理 Memory 信息
-    if memoryInfo != nil {
+    if memoryInfo != (MemoryInfo{}) {
         var memoryInfoArray []MemoryData
         if existingData["memory_info"] != nil {
             if err := json.Unmarshal(existingData["memory_info"], &memoryInfoArray); err != nil {
@@ -764,7 +767,7 @@ func UpdateSystemInfo(db *sql.DB, hostInfoID int, cpuInfo *CPUInfo, memoryInfo *
         }
         memoryData := MemoryData{
             Time: currentTime,
-            Data: *memoryInfo,
+            Data: memoryInfo,
         }
         memoryInfoArray = append(memoryInfoArray, memoryData)
         memoryInfoJSON, err := json.Marshal(memoryInfoArray)
@@ -776,7 +779,7 @@ func UpdateSystemInfo(db *sql.DB, hostInfoID int, cpuInfo *CPUInfo, memoryInfo *
     }
 
     // 处理 Process 信息
-    if processInfo != nil {
+    if processInfo != (ProcessInfo{}) {
         var processInfoArray []ProcessData
         if existingData["process_info"] != nil {
             if err := json.Unmarshal(existingData["process_info"], &processInfoArray); err != nil {
@@ -785,7 +788,7 @@ func UpdateSystemInfo(db *sql.DB, hostInfoID int, cpuInfo *CPUInfo, memoryInfo *
         }
         processData := ProcessData{
             Time: currentTime,
-            Data: *processInfo,
+            Data: processInfo,
         }
         processInfoArray = append(processInfoArray, processData)
         processInfoJSON, err := json.Marshal(processInfoArray)
@@ -797,7 +800,7 @@ func UpdateSystemInfo(db *sql.DB, hostInfoID int, cpuInfo *CPUInfo, memoryInfo *
     }
 
     // 处理 Network 信息
-    if networkInfo != nil {
+    if networkInfo != (NetworkInfo{}) {
         var networkInfoArray []NetworkData
         if existingData["network_info"] != nil {
             if err := json.Unmarshal(existingData["network_info"], &networkInfoArray); err != nil {
@@ -806,7 +809,7 @@ func UpdateSystemInfo(db *sql.DB, hostInfoID int, cpuInfo *CPUInfo, memoryInfo *
         }
         networkData := NetworkData{
             Time: currentTime,
-            Data: *networkInfo,
+            Data: networkInfo,
         }
         networkInfoArray = append(networkInfoArray, networkData)
         networkInfoJSON, err := json.Marshal(networkInfoArray)
