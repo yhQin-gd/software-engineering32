@@ -46,7 +46,7 @@ type Claims struct {
 
 type HostInfo struct {
 	ID         int       `json:"id"` // 添加 ID 字段
-	Hostname   string    `json:"hostname"`
+	Hostname   string    `json:"host_name"`
 	OS         string    `json:"os"`
 	Platform   string    `json:"platform"`
 	KernelArch string    `json:"kernel_arch"`
@@ -117,8 +117,8 @@ func InsertHostInfo(db *sql.DB, hostInfo HostInfo, username string) error {
 
 	// 检查主机记录是否存在
 	querySQL := `
-    SELECT id, hostname, EXISTS (SELECT 1 FROM host_info WHERE hostname = $1 AND os = $2 AND platform = $3 AND kernel_arch = $4)
-    FROM host_info WHERE hostname = $1 AND os = $2 AND platform = $3 AND kernel_arch = $4`
+    SELECT id, host_name, EXISTS (SELECT 1 FROM host_info WHERE host_name = $1 AND os = $2 AND platform = $3 AND kernel_arch = $4)
+    FROM host_info WHERE host_name = $1 AND os = $2 AND platform = $3 AND kernel_arch = $4`
 
 	err := db.QueryRow(querySQL, hostInfo.Hostname, hostInfo.OS, hostInfo.Platform, hostInfo.KernelArch).Scan(&hostInfoID, &hostname, &exists)
 	if err == sql.ErrNoRows {
@@ -144,9 +144,9 @@ func InsertHostInfo(db *sql.DB, hostInfo HostInfo, username string) error {
 	} else {
 		// 插入新的主机记录
 		insertSQL := `
-        INSERT INTO host_info (hostname, os, platform, kernel_arch, created_at, user_name)
+        INSERT INTO host_info (host_name, os, platform, kernel_arch, created_at, user_name)
         VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, $5)
-        RETURNING id, hostname`
+        RETURNING id, host_name`
 		err = db.QueryRow(insertSQL, hostInfo.Hostname, hostInfo.OS, hostInfo.Platform, hostInfo.KernelArch, username).Scan(&hostInfoID, &hostname)
 		if err != nil {
 			fmt.Printf("Failed to insert host_info: %v\n", err)
@@ -177,6 +177,7 @@ func InsertSystemInfo(db *sql.DB, hostInfoID int, hostname string, cpuInfo []CPU
 	fmt.Println("InsertSystemInfo : existingID 为", existingID)
 
 	if existingID > 0 {
+		fmt.Println("The hostId already exists ")
 		//UpdateSystemInfo(db, hostInfoID, cpuInfo, memoryInfo, processInfo, networkInfo)
 		return nil
 	}
@@ -324,6 +325,7 @@ func ReadMemoryInfo(db *sql.DB, hostname string, from, to string, result map[str
 		if err != nil {
 			return fmt.Errorf("扫描内存信息记录时发生错误: %v", err)
 		}
+		fmt.Println("ReadMemoryInfo memInfoJSON : ",memInfoJSON)
 
 		// 解析 JSON 数据（假设 mem_info 是一个 JSON 数组）
 		var memInfos []map[string]interface{}
@@ -389,6 +391,7 @@ func ReadCPUInfo(db *sql.DB, hostname string, from, to string, result map[string
 		if err != nil {
 			return fmt.Errorf("扫描cpu信息记录时发生错误: %v", err)
 		}
+		fmt.Println("ReadCPUInfo cpuJSON : ",cpuJSON)
 
 		// 解析 JSON 数据（假设 mem_info 是一个 JSON 数组）
 		var cpuInfos []map[string]interface{}
@@ -453,6 +456,7 @@ func ReadNetInfo(db *sql.DB, hostname string, from, to string, result map[string
 		if err != nil {
 			return fmt.Errorf("扫描net信息记录时发生错误: %v", err)
 		}
+		fmt.Println("ReadNetInfo netJSON : ",netJSON)
 
 		// 解析 JSON 数据（假设 mem_info 是一个 JSON 数组）
 		var netInfos []map[string]interface{}
@@ -517,6 +521,7 @@ func ReadProcessInfo(db *sql.DB, hostname string, from, to string, result map[st
 		if err != nil {
 			return fmt.Errorf("扫描进程信息记录时发生错误: %v", err)
 		}
+		fmt.Println("ReadProcessInfo processJSON : ",processJSON)
 
 		// 解析 JSON 数据（假设 mem_info 是一个 JSON 数组）
 		var processInfos []map[string]interface{}
@@ -567,7 +572,7 @@ func ReadDB(db *sql.DB, queryType, from, to string, hostname string) (map[string
 
 	// 查询主机信息
 	if queryType == "host" || queryType == "all" {
-		row := db.QueryRow("SELECT id, hostname, os, platform, kernel_arch, created_at FROM host_info WHERE hostname = $1", hostname)
+		row := db.QueryRow("SELECT id, host_name, os, platform, kernel_arch, created_at FROM host_info WHERE host_name = $1", hostname)
 		var id int
 		var os, platform, kernelArch string
 		var createdAt time.Time
@@ -580,7 +585,7 @@ func ReadDB(db *sql.DB, queryType, from, to string, hostname string) (map[string
 		}
 		result["host"] = map[string]interface{}{
 			"id":                   id,
-			"hostname":             hostname,
+			"host_name":             hostname,
 			"os":                   os,
 			"platform":             platform,
 			"kernel_arch":          kernelArch,
@@ -674,7 +679,7 @@ func UpdateHostInfo(db *sql.DB, host_id int, host_info map[string]string) error 
 	}
 
 	_, err = db.Exec(
-		"UPDATE host_info SET hostname = $1, os = $2, platform = $3, kernel_arch = $4, updated_at = $5 WHERE host_id = $6",
+		"UPDATE host_info SET host_name = $1, os = $2, platform = $3, kernel_arch = $4, updated_at = $5 WHERE host_id = $6",
 		host_info["Hostname"], host_info["OS"], host_info["Platform"], host_info["KernelArch"], time.Now(), host_id,
 	)
 	if err != nil {
@@ -845,7 +850,7 @@ func UpdateHostInfo(db *sql.DB, host_id int, host_info map[string]string) error 
 func UpdateToken(db *sql.DB, hostName string, token string, lastHeartBeat time.Time, status string) error {
 	//判断hostandtoken表是否存在该hostname
 	var existingName string
-	err := db.QueryRow("SELECT hostname FROM hostandtoken WHERE hostname = ", hostName).Scan(&existingName)
+	err := db.QueryRow("SELECT hos_tname FROM hostandtoken WHERE host_name = ", hostName).Scan(&existingName)
 	if err != nil {
 		return err
 	}
@@ -853,7 +858,7 @@ func UpdateToken(db *sql.DB, hostName string, token string, lastHeartBeat time.T
 		return err
 	}
 
-	_, err = db.Exec("UPDATE hostandtoken SET token = ?, last_heartbeat = ?, status = ? WHERE hostname = ?", token, lastHeartBeat, status, hostName)
+	_, err = db.Exec("UPDATE hostandtoken SET token = ?, last_heartbeat = ?, status = ? WHERE host_name = ?", token, lastHeartBeat, status, hostName)
 	if err != nil {
 		return err
 	}

@@ -15,6 +15,7 @@ import (
 	"gorm.io/gorm"
 )
 
+//属性均用驼峰命名转换后的含_的，表名就不含_。
 const createTableSQL = `
 -- roles 表
 CREATE TABLE IF NOT EXISTS roles (
@@ -29,7 +30,7 @@ CREATE TABLE IF NOT EXISTS users (
     name VARCHAR UNIQUE NOT NULL,
     email VARCHAR UNIQUE NOT NULL,
     password VARCHAR NOT NULL,
-    isverified BOOLEAN DEFAULT FALSE,
+    is_verified BOOLEAN DEFAULT FALSE,
     role_id INT REFERENCES roles(id) DEFAULT 2,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -38,7 +39,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS host_info (
 	id SERIAL PRIMARY KEY,
     user_name VARCHAR, -- REFERENCES users(name),
-	hostname VARCHAR(255)  UNIQUE,
+	host_name VARCHAR(255)  UNIQUE,
 	os TEXT NOT NULL,
 	platform TEXT NOT NULL,
 	kernel_arch TEXT NOT NULL,
@@ -49,7 +50,7 @@ CREATE TABLE IF NOT EXISTS host_info (
 CREATE TABLE IF NOT EXISTS system_info (
 	id SERIAL PRIMARY KEY,
 	host_info_id INT, -- REFERENCES host_info(id),
-	host_name VARCHAR(255), -- REFERENCES host_info(hostname),
+	host_name VARCHAR(255), -- REFERENCES host_info(host_name),
 	cpu_info JSONB,
 	memory_info JSONB,
 	process_info JSONB,
@@ -60,7 +61,7 @@ CREATE TABLE IF NOT EXISTS system_info (
 -- token表
 CREATE TABLE IF NOT EXISTS hostandtoken (
 	id SERIAL PRIMARY KEY,
-	host_name VARCHAR(255) , -- REFERENCES host_info(hostname),
+	host_name VARCHAR(255) , -- REFERENCES host_info(host_name),
 	token TEXT NOT NULL,
 	last_heartbeat TIMESTAMP DEFAULT NOW(),
 	status VARCHAR(10) DEFAULT 'offline'
@@ -307,7 +308,7 @@ func insertHostInfo(tx *gorm.DB) error {
 		platform := parts[3]
 		kernelArch := parts[4]
 
-		if err := tx.Exec("INSERT INTO host_info (user_name, hostname, os, platform, kernel_arch) VALUES (?, ?, ?, ?, ?)", userName, hostname, os, platform, kernelArch).Error; err != nil {
+		if err := tx.Exec("INSERT INTO host_info (user_name, host_name, os, platform, kernel_arch) VALUES (?, ?, ?, ?, ?)", userName, hostname, os, platform, kernelArch).Error; err != nil {
 			return fmt.Errorf("failed to insert host_info for %s: %w", hostname, err)
 		}
 	}

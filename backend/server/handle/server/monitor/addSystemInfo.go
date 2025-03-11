@@ -55,7 +55,7 @@ func ReceiveAndStoreSystemMetrics(c *gin.Context) {
 	var tokens string
 	querySQL := `
 	SELECT token 
-	FROM hostandtoken WHERE hostname = $1` //(SELECT 1 FROM hostandtoken WHERE host_name = $1)
+	FROM hostandtoken WHERE host_name = $1` //(SELECT 1 FROM hostandtoken WHERE host_name = $1)
 
 	err = db.QueryRow(querySQL, requestData.HostInfo.Hostname).Scan(&tokens)
 	if err == sql.ErrNoRows {

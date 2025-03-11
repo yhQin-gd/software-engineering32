@@ -19,12 +19,12 @@ func GetAgentInfo(c *gin.Context) {
 	}
 	defer db.Close()
 
-	hostname := c.Param("hostname")
-	fmt.Printf("host:%v", hostname)
-	fmt.Println()
+	hostname := c.Param("host_name")
 	if len(hostname) == 0 {
 		log.Printf("名字出错！")
 	}
+	fmt.Printf("host:%v", hostname)
+	fmt.Println()
 	queryType := c.DefaultQuery("type", "all")
 	from := c.Query("from")
 	to := c.Query("to")
