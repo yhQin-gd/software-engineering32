@@ -23,17 +23,19 @@ func main() {
 	if err != nil {
 		log.Fatalf("加载配置失败: %v", err)
 	}
+
+	fmt.Println("-----------------------")
 	//设置数据库连接的环境变量
 	os.Setenv("DB_USER", config.DB.User)
 	os.Setenv("DB_PASSWORD", config.DB.Password)
 	os.Setenv("DB_HOST", config.DB.Host)
 	os.Setenv("DB_PORT", config.DB.Port)
 	os.Setenv("DB_NAME", config.DB.Name)
-	fmt.Println(os.Getenv("DB_USER"))
-	fmt.Println(os.Getenv("DB_PASSWORD"))
-	fmt.Println(os.Getenv("DB_HOST"))
-	fmt.Println(os.Getenv("DB_PORT"))
-	fmt.Println(os.Getenv("DB_NAME"))
+	// fmt.Println(os.Getenv("DB_USER"))
+	// fmt.Println(os.Getenv("DB_PASSWORD"))
+	// fmt.Println(os.Getenv("DB_HOST"))
+	// fmt.Println(os.Getenv("DB_PORT"))
+	// fmt.Println(os.Getenv("DB_NAME"))
 
 	router := gin.Default()
 	router.Use(cors.CORSMiddleware())
@@ -44,6 +46,10 @@ func main() {
 	// 初始化数据库
 	if err := db.InitDB(); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
+	}
+	// 初始化数据库数据
+	if err := db.InitDBData(); err!= nil {
+		log.Fatalf("Failed to initialize data: %v", err)
 	}
 
 	// 注册 Swagger 路由
@@ -57,7 +63,7 @@ func main() {
 		auth.POST("/install", install.InstallAgent)
 		auth.POST("/system_info", monitor.ReceiveAndStoreSystemMetrics)
 		auth.GET("/list", monitor.ListAgent)
-		router.GET("/agent/:hostname", monitor.GetAgentInfo)
+		router.GET("/monitor/:hostname", monitor.GetAgentInfo)
 	}
 	router.Run("0.0.0.0:8080")
 }
