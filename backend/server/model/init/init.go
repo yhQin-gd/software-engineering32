@@ -1,13 +1,19 @@
 package init
 
 import (
+	"bufio"
+	u "cmd/server/model/user"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"os"
+	//"regexp"
+	"strings"
+
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-
 )
-
 
 const createTableSQL = `
 -- roles 表
@@ -24,7 +30,7 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR UNIQUE NOT NULL,
     password VARCHAR NOT NULL,
     isverified BOOLEAN DEFAULT FALSE,
-    role_id INT REFERENCES roles(id),
+    role_id INT REFERENCES roles(id) DEFAULT 2,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -146,6 +152,248 @@ func InitDB() error {
 	return nil
 }
 
+func isValidJSON(data string) bool {
+	var js json.RawMessage
+	return json.Unmarshal([]byte(data), &js) == nil
+}
+
+// InitDBData 初始化数据库的基本数据
+func InitDBData() error {
+	if DB == nil {
+		return fmt.Errorf("database connection is not initialized") // 检查数据库连接是否已初始化
+	}
+
+	tx := DB.Begin() // 开始事务
+	if tx.Error != nil {
+		return tx.Error // 返回事务错误
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback() // 如果发生panic，回滚事务
+		}
+	}()
+
+	var user u.User
+	result := tx.Where("name=?", "root").First(&user) // 查找用户名为root的用户
+
+	if result.Error == nil {
+		log.Printf("User already exists") // 用户已存在
+		tx.Commit()                       // 提交事务
+		return nil
+	} else if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		log.Printf("Failed to find user: %v", result.Error)
+		tx.Rollback()       // 回滚事务
+		return result.Error // 返回查找用户错误
+	}
+
+	// 插入角色数据
+	if err := insertRoles(tx); err != nil {
+		tx.Rollback() // 回滚事务
+		return err    // 返回插入角色时的错误
+	}
+	fmt.Println("1---------------")
+
+	// 插入用户数据
+	if err := insertUsers(tx); err != nil {
+		tx.Rollback() // 回滚事务
+		return err    // 返回插入用户时的错误
+	}
+	fmt.Println("2---------------")
+
+	// 插入 host_info 数据
+	if err := insertHostInfo(tx); err != nil {
+		tx.Rollback() // 回滚事务
+		return err    // 返回插入主机信息时的错误
+	}
+	fmt.Println("3---------------")
+
+	// 插入 system_info 数据
+	if err := insertSystemInfo(tx); err != nil {
+		tx.Rollback() // 回滚事务
+		return err    // 返回插入系统信息时的错误
+	}
+	fmt.Println("4---------------")
+	
+	// 插入 hostandtoken 数据
+	if err := insertHostAndToken(tx); err != nil {
+		tx.Rollback() // 回滚事务
+		return err    // 返回插入 token 信息时的错误
+	}
+	fmt.Println("5---------------")
+
+	if err := tx.Commit().Error; err != nil {
+		return err // 返回提交事务时的错误
+	}
+
+	return nil
+}
+
+// insertRoles 函数从 roles.txt 文件中读取角色数据
+func insertRoles(tx *gorm.DB) error {
+	file, err := os.Open("asset/example/roles.txt")
+	if err != nil {
+		return fmt.Errorf("failed to open roles file: %w", err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.Split(line, ",")
+		if len(parts) < 3 {
+			return fmt.Errorf("invalid line format: %s", line)
+		}
+
+		id := parts[0]
+		roleName := parts[1]
+		description := parts[2]
+
+		if err := tx.Exec("INSERT INTO roles (id, role_name, description) VALUES (?, ?, ?)", id, roleName, description).Error; err != nil {
+			return fmt.Errorf("failed to insert role %s: %w", roleName, err)
+		}
+	}
+	return scanner.Err() // 返回扫描器的错误（如果有）
+}
+
+
+// insertUsers 函数从 users.txt 文件中读取用户数据
+func insertUsers(tx *gorm.DB) error {
+	file, err := os.Open("asset/example/users.txt")
+	if err != nil {
+		return fmt.Errorf("failed to open users file: %w", err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.Split(line, ",")
+		if len(parts) < 4 {
+			return fmt.Errorf("invalid line format: %s", line)
+		}
+
+		name := parts[0]
+		email := parts[1]
+		password := parts[2]
+		roleID := parts[3]
+
+		if err := tx.Exec("INSERT INTO users (name, email, password, role_id) VALUES (?, ?, ?, ?)", name, email, password, roleID).Error; err != nil {
+			return fmt.Errorf("failed to insert user %s: %w", name, err)
+		}
+	}
+	return scanner.Err()
+}
+
+// insertHostInfo 函数从 host_info.txt 文件中读取主机信息
+func insertHostInfo(tx *gorm.DB) error {
+	file, err := os.Open("asset/example/host_info.txt")
+	if err != nil {
+		return fmt.Errorf("failed to open host_info file: %w", err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.Split(line, ",")
+		if len(parts) < 5 {
+			return fmt.Errorf("invalid line format: %s", line)
+		}
+
+		userName := parts[0]
+		hostname := parts[1]
+		os := parts[2]
+		platform := parts[3]
+		kernelArch := parts[4]
+
+		if err := tx.Exec("INSERT INTO host_info (user_name, hostname, os, platform, kernel_arch) VALUES (?, ?, ?, ?, ?)", userName, hostname, os, platform, kernelArch).Error; err != nil {
+			return fmt.Errorf("failed to insert host_info for %s: %w", hostname, err)
+		}
+	}
+	return scanner.Err()
+}
+
+// insertSystemInfo 函数从 system_info.txt 文件中读取系统信息
+func insertSystemInfo(tx *gorm.DB) error {
+    file, err := os.Open("asset/example/system_info.txt")
+    if err != nil {
+        return fmt.Errorf("failed to open system_info file: %w", err)
+    }
+    defer file.Close()
+
+    scanner := bufio.NewScanner(file)
+    for scanner.Scan() {
+        line := scanner.Text()
+		// 检查是否以 "//" 开头
+		if strings.HasPrefix(line, "//") {
+			fmt.Println("Encountered a comment line, exiting the loop.")
+			break // 退出循环
+		}
+        // fmt.Println("Read line:", line) // 输出读取的行（调试用）
+
+		parts := strings.Split(line, ",,")
+		// fmt.Println()
+		// fmt.Println("len:",len(parts))
+		// fmt.Println()
+		if len(parts) < 6 {
+			return fmt.Errorf("invalid line format: %s", line)
+		}
+        hostName := parts[0]
+        hostInfoID := parts[1]
+        cpuInfo := parts[2]
+        memoryInfo := parts[3]
+        processInfo := parts[4]
+        networkInfo := parts[5]
+		// fmt.Println("hostName:", hostName)
+		// fmt.Println("hostInfoID:", hostInfoID)
+		// fmt.Println("cpuInfo:", cpuInfo)
+		// fmt.Println("memoryInfo:", memoryInfo)
+		// fmt.Println("processInfo:", processInfo)
+		// fmt.Println("networkInfo:", networkInfo)
+
+        // 验证每个 JSON 字符串的有效性
+        if !isValidJSON(cpuInfo) || !isValidJSON(memoryInfo) || !isValidJSON(processInfo) || !isValidJSON(networkInfo) {
+            return fmt.Errorf("invalid JSON data for host %s", hostName)
+        }
+
+        // 插入数据库（注意：这里假设数据库表 system_info 的对应字段已经设置为接受 jsonb 类型）
+        if err := tx.Exec(
+            "INSERT INTO system_info (host_name, host_info_id, cpu_info, memory_info, process_info, network_info) VALUES (?, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?::jsonb)",
+            hostName, hostInfoID, cpuInfo, memoryInfo, processInfo, networkInfo,
+        ).Error; err != nil {
+            return fmt.Errorf("failed to insert system info for host %s: %w", hostName, err)
+        }
+    }
+    return scanner.Err() // 返回读取文件的错误（如果有）
+}
+
+// insertHostAndToken 函数从 hostandtoken.txt 文件中读取 token 数据
+func insertHostAndToken(tx *gorm.DB) error {
+	file, err := os.Open("asset/example/hostandtoken.txt")
+	if err != nil {
+		return fmt.Errorf("failed to open hostandtoken file: %w", err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.Split(line, ",")
+		if len(parts) < 3 {
+			return fmt.Errorf("invalid line format: %s", line)
+		}
+
+		hostName := parts[0]
+		token := parts[1]
+		status := parts[2]
+
+		if err := tx.Exec("INSERT INTO hostandtoken (host_name, token, status) VALUES (?, ?, ?)", hostName, token, status).Error; err != nil {
+			return fmt.Errorf("failed to insert token for host %s: %w", hostName, err) // 返回详细错误
+		}
+	}
+	return scanner.Err()
+}
 
 // -- cpu表
 // CREATE TABLE IF NOT EXISTS cpu_info (
@@ -166,7 +414,7 @@ func InitDB() error {
 // 	used NUMERIC(10,2) NOT NULL,
 // 	free NUMERIC(10,2) NOT NULL,
 // 	user_percent NUMERIC(5,2) NOT NULL,
-// 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP 
+// 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 // );
 
 // -- process 表
