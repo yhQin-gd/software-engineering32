@@ -158,26 +158,39 @@ func InsertHostInfo(db *sql.DB, hostInfo HostInfo, username string) error {
 	return nil
 }
 
-func InsertSystemInfo(db *sql.DB, hostInfoID int, hostname string, cpuInfo []CPUInfo, memoryInfo MemoryInfo, processInfo ProcessInfo, networkInfo NetworkInfo) error {
+func InsertSystemInfo(db *sql.DB, hostname string, cpuInfo []CPUInfo, memoryInfo MemoryInfo, processInfo ProcessInfo, networkInfo NetworkInfo) error {
 	// 检查是否已经存在对应的 system_info 记录
 	var existingID int
+	var hostInfoID int
 	var cpuInfoJSON, memoryInfoJSON, processInfoJSON, networkInfoJSON []byte
 
 	// 查询是否存在
 	querySQL := `
+	SELECT id
+	FROM host_info
+	WHERE host_name = $1
+	ORDER BY created_at DESC LIMIT 1`
+
+	err := db.QueryRow(querySQL, hostname).Scan(&hostInfoID)
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("InsertSystemInfo : failed to query host_info's id: %v", err)
+	}
+
+	// 查询是否存在
+	querySQL = `
 	SELECT id, cpu_info, memory_info, process_info, network_info
 	FROM system_info
 	WHERE host_info_id = $1
 	ORDER BY created_at DESC LIMIT 1`
 
-	err := db.QueryRow(querySQL, hostInfoID).Scan(&existingID, &cpuInfoJSON, &memoryInfoJSON, &processInfoJSON, &networkInfoJSON)
+	err = db.QueryRow(querySQL, hostInfoID).Scan(&existingID, &cpuInfoJSON, &memoryInfoJSON, &processInfoJSON, &networkInfoJSON)
 	if err != nil && err != sql.ErrNoRows {
 		return fmt.Errorf("failed to query system_info: %v", err)
 	}
 	fmt.Println("InsertSystemInfo : existingID 为", existingID)
 
 	if existingID > 0 {
-		fmt.Println("The hostId already exists ")
+		fmt.Println("InsertSystemInfo : The hostId already exists!")
 		//UpdateSystemInfo(db, hostInfoID, cpuInfo, memoryInfo, processInfo, networkInfo)
 		return nil
 	}
@@ -287,7 +300,33 @@ func InsertSystemInfo(db *sql.DB, hostInfoID int, hostname string, cpuInfo []CPU
 	return nil
 }
 
-func InsertHostandToken(db *sql.DB, UserName string, Token string) error {
+func InsertHostandToken(db *sql.DB, hostname string, Token string) error {
+	var existingID int
+	// 查询是否存在
+	querySQL := `
+	SELECT id
+	FROM hostandtoken
+	WHERE host_name = $1`
+
+	err := db.QueryRow(querySQL, hostname).Scan(&existingID)
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("failed to query hostandtoken: %v", err)
+	}
+	if existingID > 0 {
+		// // 更新已存在的主机记录
+		// updateSQL := `
+        // UPDATE hostandtoken
+        // SET token = $1
+        // WHERE id = $2`
+		// _, err = db.Exec(updateSQL, Token, hostname)
+		// if err != nil {
+		// 	fmt.Printf("Failed to update hostandtoken's token: %v\n", err)
+		// 	return err
+		// }
+		// fmt.Printf("Updated existing hostandtoken with token: %d\n", Token)
+		fmt.Println("InsertHostandToken : The host_name already exists!")
+		return nil
+	}
 
 	// 插入新的记录
 	fmt.Println("Inserting new host")
@@ -295,7 +334,7 @@ func InsertHostandToken(db *sql.DB, UserName string, Token string) error {
 	INSERT INTO hostandtoken (host_name, token)
 	VALUES ($1, $2) RETURNING token`
 	var token string
-	err := db.QueryRow(insertSQL, UserName, Token).Scan(&token)
+	err = db.QueryRow(insertSQL, hostname, Token).Scan(&token)
 	if err != nil {
 		log.Fatalf("Failed to query host info: %v\n", err)
 		return err
@@ -325,7 +364,7 @@ func ReadMemoryInfo(db *sql.DB, hostname string, from, to string, result map[str
 		if err != nil {
 			return fmt.Errorf("扫描内存信息记录时发生错误: %v", err)
 		}
-		fmt.Println("ReadMemoryInfo memInfoJSON : ",memInfoJSON)
+		fmt.Println("ReadMemoryInfo memInfoJSON : ", memInfoJSON)
 
 		// 解析 JSON 数据（假设 mem_info 是一个 JSON 数组）
 		var memInfos []map[string]interface{}
@@ -391,7 +430,7 @@ func ReadCPUInfo(db *sql.DB, hostname string, from, to string, result map[string
 		if err != nil {
 			return fmt.Errorf("扫描cpu信息记录时发生错误: %v", err)
 		}
-		fmt.Println("ReadCPUInfo cpuJSON : ",cpuJSON)
+		fmt.Println("ReadCPUInfo cpuJSON : ", cpuJSON)
 
 		// 解析 JSON 数据（假设 mem_info 是一个 JSON 数组）
 		var cpuInfos []map[string]interface{}
@@ -456,7 +495,7 @@ func ReadNetInfo(db *sql.DB, hostname string, from, to string, result map[string
 		if err != nil {
 			return fmt.Errorf("扫描net信息记录时发生错误: %v", err)
 		}
-		fmt.Println("ReadNetInfo netJSON : ",netJSON)
+		fmt.Println("ReadNetInfo netJSON : ", netJSON)
 
 		// 解析 JSON 数据（假设 mem_info 是一个 JSON 数组）
 		var netInfos []map[string]interface{}
@@ -521,7 +560,7 @@ func ReadProcessInfo(db *sql.DB, hostname string, from, to string, result map[st
 		if err != nil {
 			return fmt.Errorf("扫描进程信息记录时发生错误: %v", err)
 		}
-		fmt.Println("ReadProcessInfo processJSON : ",processJSON)
+		fmt.Println("ReadProcessInfo processJSON : ", processJSON)
 
 		// 解析 JSON 数据（假设 mem_info 是一个 JSON 数组）
 		var processInfos []map[string]interface{}
@@ -585,7 +624,7 @@ func ReadDB(db *sql.DB, queryType, from, to string, hostname string) (map[string
 		}
 		result["host"] = map[string]interface{}{
 			"id":                   id,
-			"host_name":             hostname,
+			"host_name":            hostname,
 			"os":                   os,
 			"platform":             platform,
 			"kernel_arch":          kernelArch,
@@ -682,7 +721,7 @@ func UpdateHostInfo(db *sql.DB, host_id int, host_info map[string]string) error 
 	}
 
 	_, err = db.Exec(
-	"UPDATE host_info SET hostname = $1, os = $2, platform = $3, kernel_arch = $4 WHERE host_id = $6",
+	"UPDATE host_info SET host_name = $1, os = $2, platform = $3, kernel_arch = $4 WHERE host_id = $6",
 		host_info["Hostname"], host_info["OS"], host_info["Platform"], host_info["KernelArch"], host_id,
 	)
 	if err != nil {
