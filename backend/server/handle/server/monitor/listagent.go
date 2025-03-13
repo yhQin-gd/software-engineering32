@@ -1,12 +1,11 @@
 package monitor
 
 import (
-	"cmd/server/middlewire"
 	"cmd/server/model"
+	"log"
 	"net/http"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 )
@@ -20,21 +19,18 @@ func ListAgent(c *gin.Context) {
 	}
 	defer db.Close()
 
-	// 获取并验证 JWT
-	tokenStr := c.GetHeader("Authorization")
-	claims := &middlewire.Claims{}
-
-	// 解析 JWT 并提取声明
-	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
-		return middlewire.JwtKey, nil
-	})
-	if err != nil || !token.Valid {
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "无效的 token"})
+	// 从上下文中获取用户名
+	Username, exists := c.Get("username")
+	if !exists {
+		log.Printf("未找到用户名")
+		c.JSON(401, gin.H{
+			"code":    401,
+			"success": false,
+			"message": "未找到用户信息",
+		})
 		return
 	}
-
-	// 使用 JWT 中的用户名查询
-	username := claims.Username
+	username := Username.(string)
 
 	// 解析时间查询参数
 	from := c.Query("from")
@@ -60,9 +56,9 @@ func ListAgent(c *gin.Context) {
 
 	// 查询数据库，过滤出当前用户的主机
 	query := `
-		SELECT id, hostname, os, platform, kernel_arch, host_info_created_at
+		SELECT id, host_name, os, platform, kernel_arch, created_at
 		FROM host_info
-		WHERE user_name = $1 AND host_info_created_at BETWEEN $2 AND $3
+		WHERE user_name = $1 AND created_at BETWEEN $2 AND $3
 	`
 
 	rows, err := db.Query(query, username, fromTime, toTime)

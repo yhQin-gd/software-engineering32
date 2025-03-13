@@ -19,12 +19,14 @@ func GetAgentInfo(c *gin.Context) {
 	}
 	defer db.Close()
 
-	hostID := c.Param("hostname")
-	fmt.Printf("host:%v", hostID)
-	fmt.Println()
-	if len(hostID) == 0 {
+	hostname := c.Param("hostname")
+	if len(hostname) == 0 {
 		log.Printf("名字出错！")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "主机名不能为空"})
+		return
 	}
+	fmt.Printf("hostname:%v", hostname)
+	fmt.Println()
 	queryType := c.DefaultQuery("type", "all")
 	from := c.Query("from")
 	to := c.Query("to")
@@ -36,7 +38,7 @@ func GetAgentInfo(c *gin.Context) {
 		to = "9999-12-31T23:59:59Z"
 	}
 
-	result, err := model.ReadDB(db, queryType, from, to, hostID)
+	result, err := model.ReadDB(db, queryType, from, to, hostname)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		log.Printf("error:%f", err)
