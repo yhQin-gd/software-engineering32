@@ -7,6 +7,7 @@ import (
 	"cmd/server/handle/user/login"
 	"cmd/server/middlewire"
 	"cmd/server/middlewire/cors"
+	"cmd/server/model"
 	db "cmd/server/model/init"
 	"fmt"
 	"log"
@@ -48,8 +49,11 @@ func main() {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	// 初始化数据库数据
-	if err := db.InitDBData(); err!= nil {
+	if err := db.InitDBData(); err != nil {
 		log.Fatalf("Failed to initialize data: %v", err)
+	}
+	if err := model.InitDB(); err != nil {
+		log.Fatalf("Failed to initialize model data: %v", err)
 	}
 
 	// 注册 Swagger 路由

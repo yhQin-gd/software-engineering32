@@ -62,13 +62,13 @@ func Register(c *gin.Context) {
 	if len(input.Name) == 0 {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"message": "用户名不能为空"})
 		return
-	}else if len(input.Email) == 0 {
+	} else if len(input.Email) == 0 {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"message": "邮箱不能为空"})
 		return
-	}else if !isValidEmail(input.Email) {
+	} else if !isValidEmail(input.Email) {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"message": "邮箱格式不正确"})
 		return
-	}else if  len(input.Password) < 6 || len(input.Password) > 16 {
+	} else if len(input.Password) < 6 || len(input.Password) > 16 {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"message": "密码长度应该不小于6，不大于16"})
 		return
 	}
@@ -79,7 +79,7 @@ func Register(c *gin.Context) {
 	if err == nil {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"message": "用户名已存在"})
 		return
-	}else if !errors.Is(err, gorm.ErrRecordNotFound) {
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		// 如果 err 不为 nil 且不是因为记录未找到导致的，则是其他数据库错误
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询用户名失败"})
 		return
@@ -89,7 +89,7 @@ func Register(c *gin.Context) {
 	if err == nil {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"message": "邮箱已存在"})
 		return
-	}else if !errors.Is(err, gorm.ErrRecordNotFound) {
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		// 如果 err 不为 nil 且不是因为记录未找到导致的，则是其他数据库错误
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询邮箱失败"})
 		return
@@ -97,13 +97,13 @@ func Register(c *gin.Context) {
 
 	// 创建用户
 	newUser := u.User{
-        Name:       input.Name,
-        Email:      input.Email,
-        Password:   input.Password,
-        IsVerified: true,
-    }
+		Name:       input.Name,
+		Email:      input.Email,
+		Password:   input.Password,
+		IsVerified: true,
+	}
 
-	err = m_init.DB.Create(&newUser).Error;
+	err = m_init.DB.Create(&newUser).Error
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "用户创建失败"})
 		return
@@ -140,7 +140,7 @@ func Login(c *gin.Context) {
 
 	// 查找用户
 	var user u.User
-	err := m_init.DB.Where("name = ?", input.Name).First(&user).Error;
+	err := m_init.DB.Where("name = ?", input.Name).First(&user).Error
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "用户不存在"})
 		return
