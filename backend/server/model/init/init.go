@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+
 	//"regexp"
 	"strings"
 
@@ -15,7 +16,7 @@ import (
 	"gorm.io/gorm"
 )
 
-//属性均用驼峰命名转换后的含_的，表名就不含_。
+// 属性均用驼峰命名转换后的含_的，表名就不含_。
 const createTableSQL = `
 -- roles 表
 CREATE TABLE IF NOT EXISTS roles (
@@ -83,30 +84,26 @@ CREATE INDEX IF NOT EXISTS idx_hostandtoken_last_heartbeat ON hostandtoken(last_
 `
 
 // cpu_info示例，每次一新的数据就追加进json里面，这样可以保存多个时间戳的数据
-// {
-//     "cpu_info": [
-//         {
-//             "time": "2023-10-10T12:34:56Z",
-//             "data": {
-//                 "id": 1,
-//                 "model_name": "Intel Xeon E5-2678 v3",
-//                 "cores_num": 12,
-//                 "percent": 45.7,
-//                 "updated_at": "2023-10-10T12:34:56Z"
-//             }
-//         },
-//         {
-//             "time": "2023-10-10T12:35:56Z",
-//             "data": {
-//                 "id": 1,
-//                 "model_name": "Intel Xeon E5-2678 v3",
-//                 "cores_num": 12,
-//                 "percent": 50.2,
-//                 "updated_at": "2023-10-10T12:35:56Z"
-//             }
-//         }
-//     ]
-// }
+// [
+//   {
+//     "data": [
+//       {
+//         "id": 0,
+//         "percent": 25.5,
+//         "cores_num": 6,
+//         "model_name": "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz"
+//       },
+//       {
+//         "id": 0,
+//         "percent": 25.5,
+//         "cores_num": 6,
+//         "model_name": "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz"
+//       }
+//     ],
+//     "time": "2025-03-11T13:13:30Z"
+//   },
+//   ……
+// ]
 
 var DB *gorm.DB
 
@@ -215,7 +212,7 @@ func InitDBData() error {
 		return err    // 返回插入系统信息时的错误
 	}
 	fmt.Println("4---------------")
-	
+
 	// 插入 hostandtoken 数据
 	if err := insertHostAndToken(tx); err != nil {
 		tx.Rollback() // 回滚事务
@@ -256,7 +253,6 @@ func insertRoles(tx *gorm.DB) error {
 	}
 	return scanner.Err() // 返回扫描器的错误（如果有）
 }
-
 
 // insertUsers 函数从 users.txt 文件中读取用户数据
 func insertUsers(tx *gorm.DB) error {
@@ -317,21 +313,21 @@ func insertHostInfo(tx *gorm.DB) error {
 
 // insertSystemInfo 函数从 system_info.txt 文件中读取系统信息
 func insertSystemInfo(tx *gorm.DB) error {
-    file, err := os.Open("asset/example/system_info.txt")
-    if err != nil {
-        return fmt.Errorf("failed to open system_info file: %w", err)
-    }
-    defer file.Close()
+	file, err := os.Open("asset/example/system_info.txt")
+	if err != nil {
+		return fmt.Errorf("failed to open system_info file: %w", err)
+	}
+	defer file.Close()
 
-    scanner := bufio.NewScanner(file)
-    for scanner.Scan() {
-        line := scanner.Text()
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
 		// 检查是否以 "//" 开头
 		if strings.HasPrefix(line, "//") {
 			fmt.Println("Encountered a comment line, exiting the loop.")
 			break // 退出循环
 		}
-        // fmt.Println("Read line:", line) // 输出读取的行（调试用）
+		// fmt.Println("Read line:", line) // 输出读取的行（调试用）
 
 		parts := strings.Split(line, ",,")
 		// fmt.Println()
@@ -340,12 +336,12 @@ func insertSystemInfo(tx *gorm.DB) error {
 		if len(parts) < 6 {
 			return fmt.Errorf("invalid line format: %s", line)
 		}
-        hostName := parts[0]
-        hostInfoID := parts[1]
-        cpuInfo := parts[2]
-        memoryInfo := parts[3]
-        processInfo := parts[4]
-        networkInfo := parts[5]
+		hostName := parts[0]
+		hostInfoID := parts[1]
+		cpuInfo := parts[2]
+		memoryInfo := parts[3]
+		processInfo := parts[4]
+		networkInfo := parts[5]
 		// fmt.Println("hostName:", hostName)
 		// fmt.Println("hostInfoID:", hostInfoID)
 		// fmt.Println("cpuInfo:", cpuInfo)
@@ -353,20 +349,20 @@ func insertSystemInfo(tx *gorm.DB) error {
 		// fmt.Println("processInfo:", processInfo)
 		// fmt.Println("networkInfo:", networkInfo)
 
-        // 验证每个 JSON 字符串的有效性
-        if !isValidJSON(cpuInfo) || !isValidJSON(memoryInfo) || !isValidJSON(processInfo) || !isValidJSON(networkInfo) {
-            return fmt.Errorf("invalid JSON data for host %s", hostName)
-        }
+		// 验证每个 JSON 字符串的有效性
+		if !isValidJSON(cpuInfo) || !isValidJSON(memoryInfo) || !isValidJSON(processInfo) || !isValidJSON(networkInfo) {
+			return fmt.Errorf("invalid JSON data for host %s", hostName)
+		}
 
-        // 插入数据库（注意：这里假设数据库表 system_info 的对应字段已经设置为接受 jsonb 类型）
-        if err := tx.Exec(
-            "INSERT INTO system_info (host_name, host_info_id, cpu_info, memory_info, process_info, network_info) VALUES (?, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?::jsonb)",
-            hostName, hostInfoID, cpuInfo, memoryInfo, processInfo, networkInfo,
-        ).Error; err != nil {
-            return fmt.Errorf("failed to insert system info for host %s: %w", hostName, err)
-        }
-    }
-    return scanner.Err() // 返回读取文件的错误（如果有）
+		// 插入数据库（注意：这里假设数据库表 system_info 的对应字段已经设置为接受 jsonb 类型）
+		if err := tx.Exec(
+			"INSERT INTO system_info (host_name, host_info_id, cpu_info, memory_info, process_info, network_info) VALUES (?, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?::jsonb)",
+			hostName, hostInfoID, cpuInfo, memoryInfo, processInfo, networkInfo,
+		).Error; err != nil {
+			return fmt.Errorf("failed to insert system info for host %s: %w", hostName, err)
+		}
+	}
+	return scanner.Err() // 返回读取文件的错误（如果有）
 }
 
 // insertHostAndToken 函数从 hostandtoken.txt 文件中读取 token 数据
