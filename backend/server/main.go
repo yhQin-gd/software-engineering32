@@ -31,6 +31,12 @@ func main() {
 	os.Setenv("DB_HOST", config.DB.Host)
 	os.Setenv("DB_PORT", config.DB.Port)
 	os.Setenv("DB_NAME", config.DB.Name)
+	os.Setenv("EMAIL_NAME", config.Email.Name)
+	os.Setenv("EMAIL_PASSWORD", config.Email.Password)
+	os.Setenv("BASE_URL", config.Email.Url)
+	os.Setenv("SMTP_SERVER_HOST", config.SMTPServer.Host)
+	os.Setenv("SMTP_SERVER_PORT", config.SMTPServer.Port)
+
 	// fmt.Println(os.Getenv("DB_USER"))
 	// fmt.Println(os.Getenv("DB_PASSWORD"))
 	// fmt.Println(os.Getenv("DB_HOST"))
@@ -60,6 +66,8 @@ func main() {
 	// 需要 JWT 认证的路由
 	auth := router.Group("/agent", middlewire.JWTAuthMiddleware())
 	{
+		auth.POST("/reset_password", login.ResetPassword)
+		auth.POST("/request_reset_password", login.RequestResetPassword)
 		auth.POST("/install", install.InstallAgent)
 		auth.POST("/addSystemInfo", monitor.ReceiveAndStoreSystemMetrics)
 		auth.GET("/list", monitor.ListAgent)

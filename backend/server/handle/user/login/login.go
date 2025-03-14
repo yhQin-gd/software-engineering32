@@ -3,9 +3,18 @@ package login
 import (
 	"cmd/server/middlewire"
 	"errors"
+	"fmt"
+	"log"
 	"net/http"
+	"strings"
+
+	//"net/smtp"
+	"os"
 	"regexp"
+	"strconv"
 	"time"
+
+	"gopkg.in/gomail.v2"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
@@ -62,13 +71,13 @@ func Register(c *gin.Context) {
 	if len(input.Name) == 0 {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"message": "用户名不能为空"})
 		return
-	}else if len(input.Email) == 0 {
+	} else if len(input.Email) == 0 {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"message": "邮箱不能为空"})
 		return
-	}else if !isValidEmail(input.Email) {
+	} else if !isValidEmail(input.Email) {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"message": "邮箱格式不正确"})
 		return
-	}else if  len(input.Password) < 6 || len(input.Password) > 16 {
+	} else if len(input.Password) < 6 || len(input.Password) > 16 {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"message": "密码长度应该不小于6，不大于16"})
 		return
 	}
@@ -79,7 +88,7 @@ func Register(c *gin.Context) {
 	if err == nil {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"message": "用户名已存在"})
 		return
-	}else if !errors.Is(err, gorm.ErrRecordNotFound) {
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		// 如果 err 不为 nil 且不是因为记录未找到导致的，则是其他数据库错误
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询用户名失败"})
 		return
@@ -89,7 +98,7 @@ func Register(c *gin.Context) {
 	if err == nil {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"message": "邮箱已存在"})
 		return
-	}else if !errors.Is(err, gorm.ErrRecordNotFound) {
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		// 如果 err 不为 nil 且不是因为记录未找到导致的，则是其他数据库错误
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询邮箱失败"})
 		return
@@ -97,13 +106,13 @@ func Register(c *gin.Context) {
 
 	// 创建用户
 	newUser := u.User{
-        Name:       input.Name,
-        Email:      input.Email,
-        Password:   input.Password,
-        IsVerified: true,
-    }
+		Name:       input.Name,
+		Email:      input.Email,
+		Password:   input.Password,
+		IsVerified: true,
+	}
 
-	err = m_init.DB.Create(&newUser).Error;
+	err = m_init.DB.Create(&newUser).Error
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "用户创建失败"})
 		return
@@ -140,7 +149,7 @@ func Login(c *gin.Context) {
 
 	// 查找用户
 	var user u.User
-	err := m_init.DB.Where("name = ?", input.Name).First(&user).Error;
+	err := m_init.DB.Where("name = ?", input.Name).First(&user).Error
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "用户不存在"})
 		return
@@ -174,18 +183,116 @@ func Login(c *gin.Context) {
 	})
 }
 
-// // 初始化数据库并创建用户表
-// func InitDB() (*sql.DB, error) {
-// 	// 连接 PostgreSQL 数据库，替换连接信息
-// 	connStr := "host=192.168.31.251 port=5432 user=postgres password=cCyjKKMyweCer8f3 dbname=monitor sslmode=disable"
-// 	db, err := sql.Open("postgres", connStr)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("连接数据库时出错: %v", err)
-// 	}
+// 密码找回：-----------------------------------
+func RequestResetPassword(c *gin.Context) {
+	// 实现请求重置密码的逻辑
+	var request struct {
+		Email string `json:"email"`
+	}
 
-// 	// 检查数据库连接
-// 	if err = db.Ping(); err != nil {
-// 		return nil, fmt.Errorf("检查连接时出错: %v", err)
-// 	}
-// 	return db, err
-// }
+	if err := c.BindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "请求数据格式错误"})
+		return
+	}
+
+	// 查找用户
+	var user u.User
+	err := m_init.DB.Where("email = ?", request.Email).First(&user).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"message": "用户未找到"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询失败"})
+		}
+		return
+	}
+
+	// 生成唯一的重置密码 token
+	token := fmt.Sprintf("%d", time.Now().UnixNano())
+	// 在数据库中保存 token
+	err = m_init.DB.Model(&user).Update("token", token).Error
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "保存 token 失败"})
+		return
+	}
+
+	// 发送重置密码邮件
+	sendResetPasswordEmail(request.Email, token)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "重置密码请求成功",
+	})
+}
+
+func ResetPassword(c *gin.Context) {
+	// 实现重置密码的逻辑
+	var request struct {
+		Token       string `json:"token"`
+		NewPassword string `json:"new_password"`
+	}
+
+	if err := c.BindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "请求数据格式错误"})
+	}
+
+	var user u.User
+	err := m_init.DB.Where("token = ?", request.Token).First(&user).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"message": "无效的重置密码 token"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询失败"})
+		}
+		return
+	}
+
+	err = m_init.DB.Model(&user).Update("token", nil).Error
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "密码重置成功，但是 token 重置失败"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "重置密码成功",
+	})
+}
+
+func sendResetPasswordEmail(email, token string) {
+	myEmail := os.Getenv("EMAIL_NAME")
+	myPassword := os.Getenv("EMAIL_PASSWORD")
+	baseUrl := os.Getenv("BASE_URL")
+	smtpServerHost := os.Getenv("SMTP_SERVER_HOST")
+	smtpServerPortStr := os.Getenv("SMTP_SERVER_PORT")
+
+	if myEmail == "" || myPassword == "" || baseUrl == "" || smtpServerHost == "" || smtpServerPortStr == "" {
+		log.Fatalf("环境变量未正确设置")
+	}
+
+	smtpServerPort, err := strconv.Atoi(smtpServerPortStr)
+	if err != nil {
+		log.Fatalf("将端口号转换为整数时出错: %v", err)
+	}
+
+	log.Printf("Email: %s, SMTP Server: %s, Port: %d", myEmail, smtpServerHost, smtpServerPort)
+
+	m := gomail.NewMessage()
+	m.SetHeader("From", myEmail)
+	m.SetHeader("To", email)
+	m.SetHeader("Subject", "Password Reset Request")
+	m.SetBody("text/html", fmt.Sprintf(`
+		<h1>Password Reset</h1>
+		<p>Click the link to reset your password: <a href="%s/reset-password?token=%s">Reset Password</a></p>
+	`, baseUrl, token))
+ 
+	d := gomail.NewDialer(smtpServerHost, smtpServerPort, myEmail, myPassword)
+	if err := d.DialAndSend(m); err != nil {
+		log.Printf("发送邮件失败: %v", err)
+		if strings.Contains(err.Error(), "535") { // 例如，检查错误消息中是否包含 SMTP 身份验证失败的代码
+			log.Printf("可能是 SMTP 身份验证错误")
+		} else if strings.Contains(err.Error(), "connection refused") {
+			log.Printf("SMTP 服务器连接被拒绝")
+		}
+	} else {
+		log.Println("邮件发送成功")
+	}
+}

@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS users (
     password VARCHAR NOT NULL,
     is_verified BOOLEAN DEFAULT FALSE,
     role_id INT REFERENCES roles(id) DEFAULT 2,
+	token TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
