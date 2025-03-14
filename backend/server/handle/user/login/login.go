@@ -273,7 +273,7 @@ func sendResetPasswordEmail(email, token string) {
 		log.Fatalf("将端口号转换为整数时出错: %v", err)
 	}
 
-	log.Printf("Email: %s, SMTP Server: %s, Port: %d", myEmail, smtpServerHost, smtpServerPort)
+	log.Printf("Email: %s, Password: %s, SMTP Server: %s, Port: %d, BaseUrl: %s", myEmail, myPassword, smtpServerHost, smtpServerPort, baseUrl)
 
 	m := gomail.NewMessage()
 	m.SetHeader("From", myEmail)
@@ -281,9 +281,9 @@ func sendResetPasswordEmail(email, token string) {
 	m.SetHeader("Subject", "Password Reset Request")
 	m.SetBody("text/html", fmt.Sprintf(`
 		<h1>Password Reset</h1>
-		<p>Click the link to reset your password: <a href="%s/reset-password?token=%s">Reset Password</a></p>
+		<p>Click the link to reset your password: <a href="%s/reset_password?token=%s" >Reset Password</a></p>
 	`, baseUrl, token))
- 
+
 	d := gomail.NewDialer(smtpServerHost, smtpServerPort, myEmail, myPassword)
 	if err := d.DialAndSend(m); err != nil {
 		log.Printf("发送邮件失败: %v", err)
