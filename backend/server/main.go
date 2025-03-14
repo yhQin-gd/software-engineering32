@@ -57,6 +57,7 @@ func main() {
 	if err := db.InitDBData(); err != nil {
 		log.Fatalf("Failed to initialize data: %v", err)
 	}
+	router.Static("/static", "./static")
 
 	// 注册 Swagger 路由
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, ginSwagger.URL("/docs/swagger.json")))
@@ -66,7 +67,7 @@ func main() {
 	// 需要 JWT 认证的路由
 	auth := router.Group("/agent", middlewire.JWTAuthMiddleware())
 	{
-		auth.POST("/reset_password", login.ResetPassword)
+		router.POST("/reset_password", login.ResetPassword)
 		auth.POST("/request_reset_password", login.RequestResetPassword)
 		auth.POST("/install", install.InstallAgent)
 		auth.POST("/addSystemInfo", monitor.ReceiveAndStoreSystemMetrics)

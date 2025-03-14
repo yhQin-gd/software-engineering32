@@ -209,6 +209,7 @@ func RequestResetPassword(c *gin.Context) {
 
 	// 生成唯一的重置密码 token
 	token := fmt.Sprintf("%d", time.Now().UnixNano())
+	fmt.Println("密码找回时生成的token为：", token)
 	// 在数据库中保存 token
 	err = m_init.DB.Model(&user).Update("token", token).Error
 	if err != nil {
@@ -233,8 +234,9 @@ func ResetPassword(c *gin.Context) {
 
 	if err := c.BindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "请求数据格式错误"})
+		return
 	}
-
+	fmt.Println("The new password is : ", request.NewPassword, ", and the token is : ", request.Token)
 	var user u.User
 	err := m_init.DB.Where("token = ?", request.Token).First(&user).Error
 	if err != nil {
@@ -243,6 +245,12 @@ func ResetPassword(c *gin.Context) {
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询失败"})
 		}
+		return
+	}
+
+	err = m_init.DB.Model(&user).Update("password", request.NewPassword).Error
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "密码重置成功，但是 token 重置失败"})
 		return
 	}
 
@@ -281,7 +289,7 @@ func sendResetPasswordEmail(email, token string) {
 	m.SetHeader("Subject", "Password Reset Request")
 	m.SetBody("text/html", fmt.Sprintf(`
 		<h1>Password Reset</h1>
-		<p>Click the link to reset your password: <a href="%s/reset_password?token=%s" >Reset Password</a></p>
+		<p>Click the link to reset your password: <a href="%s/static/reset_password.html?token=%s" >Reset Password</a></p>
 	`, baseUrl, token))
 
 	d := gomail.NewDialer(smtpServerHost, smtpServerPort, myEmail, myPassword)
