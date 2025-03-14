@@ -36,6 +36,9 @@ func main() {
 	os.Setenv("BASE_URL", config.Email.Url)
 	os.Setenv("SMTP_SERVER_HOST", config.SMTPServer.Host)
 	os.Setenv("SMTP_SERVER_PORT", config.SMTPServer.Port)
+	os.Setenv("REDIS_HOST", config.Redis.Host)
+	os.Setenv("REDIS_PORT", config.Redis.Port)
+	os.Setenv("REDIS_PASSWORD", config.Redis.Password)
 
 	// fmt.Println(os.Getenv("DB_USER"))
 	// fmt.Println(os.Getenv("DB_PASSWORD"))

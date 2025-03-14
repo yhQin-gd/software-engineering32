@@ -1,11 +1,12 @@
 package config
 
 import (
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
 	"path/filepath"
 	"runtime"
+
+	"gopkg.in/yaml.v2"
 )
 
 // DBConfig 用于保存数据库配置
@@ -17,20 +18,27 @@ type DBConfig struct {
 	Password string `yaml:"password"`
 }
 
+type RedisConfig struct {
+	Host     string `yaml:"redis_host"`
+	Port     string `yaml:"redis_port"`
+	Password string `yaml:"redis_password"`
+}
+
 type EMAILConfig struct {
-	Name string `yaml:"email_name"`
-	Password string `yaml:"email_password"`	
-	Url string `yaml:"base_url"`
+	Name     string `yaml:"email_name"`
+	Password string `yaml:"email_password"`
+	Url      string `yaml:"base_url"`
 }
 type SMTPServerConfig struct {
 	Host string `yaml:"SMTPServer_host"`
 	Port string `yaml:"SMTPServer_port"`
 }
 
-// Config 用于保存所有配置项，这里只包括数据库配置
+// Config 用于保存所有配置项
 type Config struct {
-	DB DBConfig `yaml:"db"`
-	Email EMAILConfig `yaml:"email"`
+	DB         DBConfig         `yaml:"db"`
+	Redis      RedisConfig      `yaml:redis`
+	Email      EMAILConfig      `yaml:"email"`
 	SMTPServer SMTPServerConfig `yaml:"smtp_server"`
 }
 
