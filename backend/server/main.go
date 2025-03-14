@@ -48,7 +48,7 @@ func main() {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	// 初始化数据库数据
-	if err := db.InitDBData(); err!= nil {
+	if err := db.InitDBData(); err != nil {
 		log.Fatalf("Failed to initialize data: %v", err)
 	}
 
