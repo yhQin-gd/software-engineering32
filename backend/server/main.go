@@ -31,6 +31,17 @@ func main() {
 	os.Setenv("DB_HOST", config.DB.Host)
 	os.Setenv("DB_PORT", config.DB.Port)
 	os.Setenv("DB_NAME", config.DB.Name)
+	// 邮箱服务
+	os.Setenv("EMAIL_NAME", config.Email.Name)
+	os.Setenv("EMAIL_PASSWORD", config.Email.Password)
+	os.Setenv("BASE_URL", config.Email.Url)
+	os.Setenv("SMTP_SERVER_HOST", config.SMTPServer.Host)
+	os.Setenv("SMTP_SERVER_PORT", config.SMTPServer.Port)
+	// Redis服务
+	os.Setenv("REDIS_ADDR", config.Redis.Addr)
+	os.Setenv("REDIS_PASSWORD", config.Redis.Password)
+	os.Setenv("REDIS_DB", config.Redis.DB)
+
 	// fmt.Println(os.Getenv("DB_USER"))
 	// fmt.Println(os.Getenv("DB_PASSWORD"))
 	// fmt.Println(os.Getenv("DB_HOST"))
@@ -48,9 +59,15 @@ func main() {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	// 初始化数据库数据
-	if err := db.InitDBData(); err!= nil {
+	if err := db.InitDBData(); err != nil {
 		log.Fatalf("Failed to initialize data: %v", err)
 	}
+	// 初始化redis
+	// if err := db.InitRedis(); err!= nil {
+	// 	log.Fatalf("Failed to connect to redis: %v", err)
+	// }
+
+	router.Static("/static", "./static")
 
 	// 注册 Swagger 路由
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, ginSwagger.URL("/docs/swagger.json")))
@@ -60,10 +77,13 @@ func main() {
 	// 需要 JWT 认证的路由
 	auth := router.Group("/agent", middlewire.JWTAuthMiddleware())
 	{
+		router.POST("/reset_password", login.ResetPassword)
+		auth.POST("/request_reset_password", login.RequestResetPassword)
 		auth.POST("/install", install.InstallAgent)
 		auth.POST("/addSystemInfo", monitor.ReceiveAndStoreSystemMetrics)
 		auth.GET("/list", monitor.ListAgent)
 		router.GET("/monitor/:hostname", monitor.GetAgentInfo)
 	}
+	
 	router.Run("0.0.0.0:8080")
 }

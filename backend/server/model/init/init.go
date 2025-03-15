@@ -3,15 +3,18 @@ package init
 import (
 	"bufio"
 	u "cmd/server/model/user"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 
 	//"regexp"
 	"strings"
 
+	"github.com/go-redis/redis/v8"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -33,6 +36,7 @@ CREATE TABLE IF NOT EXISTS users (
     password VARCHAR NOT NULL,
     is_verified BOOLEAN DEFAULT FALSE,
     role_id INT REFERENCES roles(id) DEFAULT 2,
+	token TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -107,6 +111,39 @@ CREATE INDEX IF NOT EXISTS idx_hostandtoken_last_heartbeat ON hostandtoken(last_
 
 var DB *gorm.DB
 
+var CTX = context.Background()
+var RDB *redis.Client
+
+func InitRedis() error {
+	redisAddr := os.Getenv("REDIS_ADDR")
+	redisPassword := os.Getenv("REDIS_PASSWORD")
+	redisDBstr := os.Getenv("REDIS_DB")
+	redisDB, err := strconv.Atoi(redisDBstr)
+	if err != nil {
+		log.Fatalf("Failed to parse Redis DB number: %v", err)
+		return err
+	}
+
+	if redisAddr == "" {
+		log.Fatal("Redis configuration is missing")
+		return fmt.Errorf("Redis configuration is missing")
+	}
+
+	RDB = redis.NewClient(&redis.Options{
+		Addr:     redisAddr,     // Redis地址
+		Password: redisPassword, // 无密码
+		DB:       redisDB,       // 使用默认DB
+	})
+
+	// 测试连接
+	_, err = RDB.Ping(CTX).Result()
+	if err != nil {
+		log.Fatalf("Could not connect to Redis: %v", err)
+		return err
+	}
+	return nil
+}
+
 // ConnectDatabase 连接到数据库
 func ConnectDatabase() error {
 	var err error
@@ -176,7 +213,7 @@ func InitDBData() error {
 	result := tx.Where("name=?", "root").First(&user) // 查找用户名为root的用户
 
 	if result.Error == nil {
-		log.Printf("User already exists") // 用户已存在
+		log.Printf("Root already exists") // 用户已存在
 		tx.Commit()                       // 提交事务
 		return nil
 	} else if !errors.Is(result.Error, gorm.ErrRecordNotFound) {

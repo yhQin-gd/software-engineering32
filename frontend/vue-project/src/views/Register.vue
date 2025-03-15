@@ -13,29 +13,49 @@
     <a><span>还没有账号？</span></a>
     <a><span>有账号，现在开始→</span></a>
   </div>
-  <div class="box">
-    <span class="close-icon1" @click1="closeRegisterBox">
+  <div class="register-box">
+    <span class="close-icon" @click="closeRegisterBox">
         <el-icon><CircleCloseFilled /></el-icon>
       </span>
-    <div class="box-title">登录</div>
+    <div class="box-title">注册</div>
     <div class="divider"></div>
     <div class="input-wrapper">
       <span class="input-icon1">
         <el-icon><UserFilled /></el-icon>
       </span>
-      <input type="text" v-model="email" placeholder="请输入用户名" class="bar">
+      <input type="text" v-model="username" placeholder="请输入用户名" class="bar">
     </div>
+
+    <div class="input-wrapper">
+      <span class="input-icon1">
+        <el-icon><Comment /></el-icon>
+      </span>
+      <input type="text" v-model="email" placeholder="请输入邮箱" class="bar">
+    </div>
+
     <div class="input-wrapper">
       <span class="input-icon2">
         <el-icon><GoodsFilled /></el-icon>
       </span>
-      <input :type="passwordType" v-model="password" placeholder="请输入密码" class="bar2" @input="handlePasswordInput">
+      <input :type="passwordType" v-model="password" placeholder="请输入密码" class="bar" @input="handlePasswordInput">
       <span class="toggle-password" @click="togglePasswordVisibility()"
             v-show="password.length > 0 && (passwordType === 'password' || passwordType === 'text')">
         <el-icon :is="passwordType === 'password'? Hide : View" :key="passwordType" />
       </span>
     </div>
-    <button class="login-button" @click="(loginClick)">登录</button>
+
+    <div class="input-wrapper">
+      <span class="input-icon2">
+        <el-icon><GoodsFilled /></el-icon>
+      </span>
+      <input :type="confirmPasswordType" v-model="confirmPassword" placeholder="请再次输入密码" class="bar" @input="handleConfirmPasswordInput">
+      <span class="toggle-password" @click="toggleConfirmPasswordVisibility()"
+            v-show="confirmPassword.length > 0 && (confirmPasswordType === 'password' || confirmPasswordType === 'text')">
+        <el-icon :is="confirmPasswordType === 'password'? Hide : View" :key="confirmPasswordType" />
+      </span>
+    </div>
+
+    <button class="register-button" @click="registerClick">注册</button>
   </div>
 </template>
 
@@ -54,7 +74,7 @@
 }
 </style>
 
-<style scoped>
+<style>
 body {
   background-color: #000000;
   height: 100vh;
@@ -129,7 +149,7 @@ a span {
   letter-spacing: 0.2em;
 }
 
-.box {
+.register-box {
   position: fixed;
   top: 50%;
   left: 50%;
@@ -137,15 +157,24 @@ a span {
   text-align: center;
   width: 60vw;
   max-width: 660px;
-  height: 65vh;
+  height: 75vh;
   background-color: #333333;
   color: white;
   padding: 20px;
   border-radius: 10px;
 }
 
+.close-icon{
+  position: fixed;
+  right: 5%; 
+  color: white;
+  font-weight: bold;
+  font-size: 20px; 
+  z-index: 4; 
+}
+
 .box-title {
-  margin-top: 1vh;
+  margin-top: 0.5vh;
   font-size: 40px;
   font-weight: bold;
 }
@@ -154,7 +183,7 @@ a span {
   width: 70%;
   height: 1px;
   background-color: #BBBBBB;
-  margin: 10px auto;
+  margin: 15px auto;
 }
 
 .bar,
@@ -165,14 +194,14 @@ a span {
   font-size: 22px;
   box-sizing: border-box;
   border-radius: 15px;
-  height: 9vh;
+  height: 8vh;
   width: 80%;
   z-index: 2;
   padding-left: 80px;
 }
 
 .bar {
-  margin: 3.5vh 0 5vh 0;
+  margin: 1.5vh 0 2vh 0;
 }
 
 .bar2 {
@@ -199,7 +228,7 @@ a span {
 }
 
 .input-icon1 {
-  top: 50%;
+  top: 58%;
 }
 
 .input-icon2 {
@@ -216,7 +245,7 @@ a span {
   z-index: 3;
 }
 
-.login-button {
+.register-button {
   width: 75%;
   height: 9vh;
   background-color: #2B5F92;
@@ -225,13 +254,13 @@ a span {
   color: white;
   margin-bottom: 2vh;
   z-index: 2;
-  margin-top: 5vh;
+  margin-top: 1.7vh;
   margin-bottom: 3.4vh;
   border-radius: 15px;
   border: none;
 }
 
-.login-button:hover {
+.register-button:hover {
   background-color: #224a73;
   color: white;
 }
@@ -240,67 +269,79 @@ a span {
 
 <script>
 import { useRouter } from 'vue-router';
+import { ref } from 'vue';
 import { ElMessage } from 'element-plus';
-import { UserFilled, GoodsFilled, View, Hide, InfoFilled,
-  CircleCloseFilled } from '@element-plus/icons-vue';
+import { ElIcon } from 'element-plus';
+import { UserFilled, GoodsFilled, View, Hide, InfoFilled, Comment, CircleCloseFilled } from '@element-plus/icons-vue';
 
 export default {
-  name: 'LoginPage',
-  components: {
-    UserFilled,
-    GoodsFilled,
-    View,
-    Hide,
-    InfoFilled,
-    CircleCloseFilled
-  },
-  data() {
-    return {
-      email: '',
-      password: '',
-      passwordType: 'password'
-    };
-  },
-  methods: {
-    async loginClick() {
-      try {
-        const response = await fetch('http://localhost:8080/agent/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            name: this.email,
-            password: this.password
-          })
-        });
-
-        const data = await response.json();
-
-        if (data.message === '登录成功') {
-          const token = data.token;
-          localStorage.setItem('token', token);//token存到本地
-          ElMessage.success(data.message);
-          const router = useRouter();
-          this.$router.push('/home');
-        } else {
-          ElMessage.error(data.message);
-          this.email = '';
-          this.password = '';
-        }
-      } catch (error) {
-        console.error('登录请求出错:', error);
-        ElMessage.error('登录失败，请检查网络或稍后重试');
-      }
+    name: 'LoginPage',
+    components: {
+        UserFilled,
+        GoodsFilled,
+        View,
+        Hide,
+        InfoFilled,
+        Comment,
+        ElIcon,
+        CircleCloseFilled
     },
-    togglePasswordVisibility() {
-      this.passwordType = this.passwordType === 'password' ? 'text' : 'password';
+    data() {
+        return {
+            username: '',
+            email: '',
+            password: '',
+            confirmPassword: '',
+            passwordType: 'password',
+            confirmPasswordType: 'password'
+        };
     },
-    closeRegisterBox() {
+    methods: {
+        registerClick() {
+            if (this.password!== this.confirmPassword) {
+                ElMessage.error('两次输入的密码不一致');
+                return;
+            }
+            const apiUrl = 'http://localhost:8080/agent/register';
+            const requestData = {
+                email: this.email,
+                name: this.username,
+                password: this.password
+            };
+
+            fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            })
+           .then(response => {
+                return response.json();
+            })
+           .then(data => {
+                if (data.message === '注册成功') {
+                    ElMessage.success(data.message);
+                } else {
+                    ElMessage.error(data.message);
+                }
+            })
+           .catch(error => {
+                console.error('注册失败:', error);
+                ElMessage.error('注册失败，请稍后重试');
+            });
+        },
+        togglePasswordVisibility() {
+            this.passwordType = this.passwordType === 'password'? 'text' : 'password';
+        },
+        toggleConfirmPasswordVisibility() {
+            this.confirmPasswordType = this.confirmPasswordType === 'password'? 'text' : 'password';
+        },
+        closeRegisterBox() {
             const router = useRouter();
             this.$router.push('/');
         }
-  },
-  mounted() {}
+    },
+    mounted() {}
 };
 </script>
