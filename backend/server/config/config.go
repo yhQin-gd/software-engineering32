@@ -19,9 +19,9 @@ type DBConfig struct {
 }
 
 type RedisConfig struct {
-	Host     string `yaml:"redis_host"`
-	Port     string `yaml:"redis_port"`
+	Addr     string `yaml:"redis_addr"`
 	Password string `yaml:"redis_password"`
+	DB       string    `yaml:"redis_db"`
 }
 
 type EMAILConfig struct {

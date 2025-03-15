@@ -31,14 +31,16 @@ func main() {
 	os.Setenv("DB_HOST", config.DB.Host)
 	os.Setenv("DB_PORT", config.DB.Port)
 	os.Setenv("DB_NAME", config.DB.Name)
+	// 邮箱服务
 	os.Setenv("EMAIL_NAME", config.Email.Name)
 	os.Setenv("EMAIL_PASSWORD", config.Email.Password)
 	os.Setenv("BASE_URL", config.Email.Url)
 	os.Setenv("SMTP_SERVER_HOST", config.SMTPServer.Host)
 	os.Setenv("SMTP_SERVER_PORT", config.SMTPServer.Port)
-	os.Setenv("REDIS_HOST", config.Redis.Host)
-	os.Setenv("REDIS_PORT", config.Redis.Port)
+	// Redis服务
+	os.Setenv("REDIS_ADDR", config.Redis.Addr)
 	os.Setenv("REDIS_PASSWORD", config.Redis.Password)
+	os.Setenv("REDIS_DB", config.Redis.DB)
 
 	// fmt.Println(os.Getenv("DB_USER"))
 	// fmt.Println(os.Getenv("DB_PASSWORD"))
@@ -60,6 +62,11 @@ func main() {
 	if err := db.InitDBData(); err != nil {
 		log.Fatalf("Failed to initialize data: %v", err)
 	}
+	// 初始化redis
+	// if err := db.InitRedis(); err!= nil {
+	// 	log.Fatalf("Failed to connect to redis: %v", err)
+	// }
+
 	router.Static("/static", "./static")
 
 	// 注册 Swagger 路由
@@ -77,5 +84,6 @@ func main() {
 		auth.GET("/list", monitor.ListAgent)
 		router.GET("/monitor/:hostname", monitor.GetAgentInfo)
 	}
+	
 	router.Run("0.0.0.0:8080")
 }
