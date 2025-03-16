@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"strings"
 
@@ -184,6 +185,19 @@ func Login(c *gin.Context) {
 }
 
 // 密码找回：-----------------------------------
+const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+func generateRandomToken(length int) string {
+	source := rand.NewSource(time.Now().UnixNano())
+	r := rand.New(source)
+	token := make([]byte, length)
+	for i := range token {
+		token[i] = charset[r.Intn(len(charset))]
+	}
+
+	return string(token)
+}
+
 func RequestResetPassword(c *gin.Context) {
 	// 实现请求重置密码的逻辑
 	var request struct {
@@ -208,7 +222,8 @@ func RequestResetPassword(c *gin.Context) {
 	}
 
 	// 生成唯一的重置密码 token
-	token := fmt.Sprintf("%d", time.Now().UnixNano())
+	// token := fmt.Sprintf("%d", time.Now().UnixNano())
+	token := generateRandomToken(6) // 生成6位长度的token
 	fmt.Println("密码找回时生成的token为：", token)
 	// 在数据库中保存 token
 	err = m_init.DB.Model(&user).Update("token", token).Error
@@ -237,8 +252,11 @@ func ResetPassword(c *gin.Context) {
 		return
 	}
 	fmt.Println("The new password is : ", request.NewPassword, ", and the token is : ", request.Token)
+
 	var user u.User
 	err := m_init.DB.Where("token = ?", request.Token).First(&user).Error
+	// username, _ := c.Get("username")
+	// err := m_init.DB.Where("token = ? and name = ?", request.Token, username.(string)).First(&user).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"message": "无效的重置密码 token"})
@@ -250,7 +268,7 @@ func ResetPassword(c *gin.Context) {
 
 	err = m_init.DB.Model(&user).Update("password", request.NewPassword).Error
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "密码重置成功，但是 token 重置失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "密码重置失败"})
 		return
 	}
 
@@ -265,6 +283,7 @@ func ResetPassword(c *gin.Context) {
 	})
 }
 
+// 方式一 发送token
 func sendResetPasswordEmail(email, token string) {
 	myEmail := os.Getenv("EMAIL_NAME")
 	myPassword := os.Getenv("EMAIL_PASSWORD")
@@ -288,9 +307,9 @@ func sendResetPasswordEmail(email, token string) {
 	m.SetHeader("To", email)
 	m.SetHeader("Subject", "Password Reset Request")
 	m.SetBody("text/html", fmt.Sprintf(`
-		<h1>Password Reset</h1>
-		<p>Click the link to reset your password: <a href="%s/static/reset_password.html?token=%s" >Reset Password</a></p>
-	`, baseUrl, token))
+		<h1>密码找回</h1>
+		<p>这是你的验证码：%s</p>
+	`, token))
 
 	d := gomail.NewDialer(smtpServerHost, smtpServerPort, myEmail, myPassword)
 	if err := d.DialAndSend(m); err != nil {
@@ -304,3 +323,44 @@ func sendResetPasswordEmail(email, token string) {
 		log.Println("邮件发送成功")
 	}
 }
+
+// 发送链接
+// func sendResetPasswordEmail(email, token string) {
+// 	myEmail := os.Getenv("EMAIL_NAME")
+// 	myPassword := os.Getenv("EMAIL_PASSWORD")
+// 	baseUrl := os.Getenv("BASE_URL")
+// 	smtpServerHost := os.Getenv("SMTP_SERVER_HOST")
+// 	smtpServerPortStr := os.Getenv("SMTP_SERVER_PORT")
+
+// 	if myEmail == "" || myPassword == "" || baseUrl == "" || smtpServerHost == "" || smtpServerPortStr == "" {
+// 		log.Fatalf("环境变量未正确设置")
+// 	}
+
+// 	smtpServerPort, err := strconv.Atoi(smtpServerPortStr)
+// 	if err != nil {
+// 		log.Fatalf("将端口号转换为整数时出错: %v", err)
+// 	}
+
+// 	log.Printf("Email: %s, Password: %s, SMTP Server: %s, Port: %d, BaseUrl: %s", myEmail, myPassword, smtpServerHost, smtpServerPort, baseUrl)
+
+// 	m := gomail.NewMessage()
+// 	m.SetHeader("From", myEmail)
+// 	m.SetHeader("To", email)
+// 	m.SetHeader("Subject", "Password Reset Request")
+// m.SetBody("text/html", fmt.Sprintf(`
+// 	<h1>Password Reset</h1>
+// 	<p>Click the link to reset your password: <a href="%s/static/reset_password.html?token=%s" >Reset Password</a></p>
+// `, baseUrl, token))
+
+// 	d := gomail.NewDialer(smtpServerHost, smtpServerPort, myEmail, myPassword)
+// 	if err := d.DialAndSend(m); err != nil {
+// 		log.Printf("发送邮件失败: %v", err)
+// 		if strings.Contains(err.Error(), "535") { // 例如，检查错误消息中是否包含 SMTP 身份验证失败的代码
+// 			log.Printf("可能是 SMTP 身份验证错误")
+// 		} else if strings.Contains(err.Error(), "connection refused") {
+// 			log.Printf("SMTP 服务器连接被拒绝")
+// 		}
+// 	} else {
+// 		log.Println("邮件发送成功")
+// 	}
+// }
