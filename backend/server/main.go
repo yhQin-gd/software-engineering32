@@ -31,6 +31,11 @@ func main() {
 	os.Setenv("DB_HOST", config.DB.Host)
 	os.Setenv("DB_PORT", config.DB.Port)
 	os.Setenv("DB_NAME", config.DB.Name)
+	// OSS服务
+	os.Setenv("OSS_REGION", config.OSS.OSS_REGION)
+	os.Setenv("OSS_ACCESS_KEY_ID", config.OSS.OSS_ACCESS_KEY_ID)
+	os.Setenv("OSS_ACCESS_KEY_SECRET", config.OSS.OSS_ACCESS_KEY_SECRET)
+	os.Setenv("OSS_BUCKET", config.OSS.OSS_BUCKET)
 	// 邮箱服务
 	os.Setenv("EMAIL_NAME", config.Email.Name)
 	os.Setenv("EMAIL_PASSWORD", config.Email.Password)
@@ -84,6 +89,6 @@ func main() {
 		auth.GET("/list", monitor.ListAgent)
 		router.GET("/monitor/:hostname", monitor.GetAgentInfo)
 	}
-	
+
 	router.Run("0.0.0.0:8080")
 }

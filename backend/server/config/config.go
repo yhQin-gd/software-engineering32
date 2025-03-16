@@ -18,10 +18,17 @@ type DBConfig struct {
 	Password string `yaml:"password"`
 }
 
+type OSSConfig struct {
+	OSS_REGION            string `yaml:"OSS_REGION"`
+	OSS_ACCESS_KEY_ID     string `yaml:"OSS_ACCESS_KEY_ID"`
+	OSS_ACCESS_KEY_SECRET string `yaml:"OSS_ACCESS_KEY_SECRET"`
+	OSS_BUCKET            string `yaml:"OSS_BUCKET"`
+}
+
 type RedisConfig struct {
 	Addr     string `yaml:"redis_addr"`
 	Password string `yaml:"redis_password"`
-	DB       string    `yaml:"redis_db"`
+	DB       string `yaml:"redis_db"`
 }
 
 type EMAILConfig struct {
@@ -37,7 +44,8 @@ type SMTPServerConfig struct {
 // Config 用于保存所有配置项
 type Config struct {
 	DB         DBConfig         `yaml:"db"`
-	Redis      RedisConfig      `yaml:redis`
+	OSS        OSSConfig        `yaml:"oss"`
+	Redis      RedisConfig      `yaml:"redis"`
 	Email      EMAILConfig      `yaml:"email"`
 	SMTPServer SMTPServerConfig `yaml:"smtp_server"`
 }
