@@ -343,6 +343,524 @@ func InsertHostandToken(db *sql.DB, hostname string, Token string) error {
 
 	return nil
 }
+func ReadMemoryInfo(db *sql.DB, hostname string, from, to string, result map[string]interface{}) error {
+	// 查询 JSON 数据
+	rows, err := db.Query(`SELECT id, memory_info FROM system_info WHERE hostname = $1`, hostname)
+	if err != nil {
+		return fmt.Errorf("查询内存信息时发生错误: %v", err)
+	}
+	defer rows.Close()
+
+	var memoryData []map[string]interface{}
+
+	// 遍历查询结果
+	for rows.Next() {
+		var id int
+		var memInfoJSON []byte
+
+		// 读取查询结果
+		err := rows.Scan(&id, &memInfoJSON)
+		if err != nil {
+			return fmt.Errorf("扫描内存信息记录时发生错误: %v", err)
+		}
+
+		// 解析 JSON 数据（假设 mem_info 是一个 JSON 数组）
+		var memInfos []map[string]interface{}
+		if err := json.Unmarshal(memInfoJSON, &memInfos); err != nil {
+			return fmt.Errorf("解析 JSON 数据时发生错误: %v", err)
+		}
+
+		// 遍历 JSON 数组中的每个时间点数据
+		for _, memInfo := range memInfos {
+			// 获取 updated_at 字段
+			updatedAtStr, ok := memInfo["updated_at"].(string)
+			if !ok {
+				continue // 如果 updated_at 字段不存在或类型错误，跳过该记录
+			}
+
+			// 将 updated_at 字符串转换为 time.Time
+			updatedAt, err := time.Parse(time.RFC3339, updatedAtStr)
+			if err != nil {
+				return fmt.Errorf("解析 updated_at 字段时发生错误: %v", err)
+			}
+			fromtime, err := time.Parse(time.RFC3339, from)
+			if err != nil {
+				return fmt.Errorf("解析 from 字段时发生错误: %v", err)
+			}
+			totime, err := time.Parse(time.RFC3339, to)
+			if err != nil {
+				return fmt.Errorf("解析 to 字段时发生错误: %v", err)
+			}
+			// 判断记录是否在指定时间段内
+			if (updatedAt.Equal(fromtime) || updatedAt.After(fromtime)) && updatedAt.Before(totime) {
+				memoryData = append(memoryData, memInfo)
+			}
+		}
+	}
+
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("处理内存信息记录时发生错误: %v", err)
+	}
+
+	// 将过滤后的数据插入 result
+	result["memory"] = memoryData
+
+	return nil
+}
+func ReadCPUInfo(db *sql.DB, hostname string, from, to string, result map[string]interface{}) error {
+	// 查询 JSON 数据
+	rows, err := db.Query(`SELECT id, cpu_info FROM system_info WHERE hostname = $1`, hostname)
+	if err != nil {
+		return fmt.Errorf("查询内存信息时发生错误: %v", err)
+	}
+	defer rows.Close()
+
+	var cpuData []map[string]interface{}
+
+	// 遍历查询结果
+	for rows.Next() {
+		var id int
+		var cpuJSON []byte
+
+		// 读取查询结果
+		err := rows.Scan(&id, &cpuJSON)
+		if err != nil {
+			return fmt.Errorf("扫描内存信息记录时发生错误: %v", err)
+		}
+
+		// 解析 JSON 数据（假设 mem_info 是一个 JSON 数组）
+		var cpuInfos []map[string]interface{}
+		if err := json.Unmarshal(cpuJSON, &cpuInfos); err != nil {
+			return fmt.Errorf("解析 JSON 数据时发生错误: %v", err)
+		}
+
+		// 遍历 JSON 数组中的每个时间点数据
+		for _, memInfo := range cpuInfos {
+			// 获取 updated_at 字段
+			updatedAtStr, ok := memInfo["updated_at"].(string)
+			if !ok {
+				continue // 如果 updated_at 字段不存在或类型错误，跳过该记录
+			}
+
+			// 将 updated_at 字符串转换为 time.Time
+			updatedAt, err := time.Parse(time.RFC3339, updatedAtStr)
+			if err != nil {
+				return fmt.Errorf("解析 updated_at 字段时发生错误: %v", err)
+			}
+			fromtime, err := time.Parse(time.RFC3339, from)
+			if err != nil {
+				return fmt.Errorf("解析 from 字段时发生错误: %v", err)
+			}
+			totime, err := time.Parse(time.RFC3339, to)
+			if err != nil {
+				return fmt.Errorf("解析 to 字段时发生错误: %v", err)
+			}
+			// 判断记录是否在指定时间段内
+			if (updatedAt.Equal(fromtime) || updatedAt.After(fromtime)) && updatedAt.Before(totime) {
+				cpuData = append(cpuData, memInfo)
+			}
+		}
+	}
+
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("处理内存信息记录时发生错误: %v", err)
+	}
+
+	// 将过滤后的数据插入 result
+	result["cpu"] = cpuData
+
+	return nil
+}
+func ReadNetInfo(db *sql.DB, hostname string, from, to string, result map[string]interface{}) error {
+	// 查询 JSON 数据
+	rows, err := db.Query(`SELECT id, network_info FROM system_info WHERE hostname = $1`, hostname)
+	if err != nil {
+		return fmt.Errorf("查询内存信息时发生错误: %v", err)
+	}
+	defer rows.Close()
+
+	var netData []map[string]interface{}
+
+	// 遍历查询结果
+	for rows.Next() {
+		var id int
+		var netJSON []byte
+
+		// 读取查询结果
+		err := rows.Scan(&id, &netJSON)
+		if err != nil {
+			return fmt.Errorf("扫描内存信息记录时发生错误: %v", err)
+		}
+
+		// 解析 JSON 数据（假设 mem_info 是一个 JSON 数组）
+		var netInfos []map[string]interface{}
+		if err := json.Unmarshal(netJSON, &netInfos); err != nil {
+			return fmt.Errorf("解析 JSON 数据时发生错误: %v", err)
+		}
+
+		// 遍历 JSON 数组中的每个时间点数据
+		for _, netInfo := range netInfos {
+			// 获取 updated_at 字段
+			updatedAtStr, ok := netInfo["updated_at"].(string)
+			if !ok {
+				continue // 如果 updated_at 字段不存在或类型错误，跳过该记录
+			}
+
+			// 将 updated_at 字符串转换为 time.Time
+			updatedAt, err := time.Parse(time.RFC3339, updatedAtStr)
+			if err != nil {
+				return fmt.Errorf("解析 updated_at 字段时发生错误: %v", err)
+			}
+			fromtime, err := time.Parse(time.RFC3339, from)
+			if err != nil {
+				return fmt.Errorf("解析 from 字段时发生错误: %v", err)
+			}
+			totime, err := time.Parse(time.RFC3339, to)
+			if err != nil {
+				return fmt.Errorf("解析 to 字段时发生错误: %v", err)
+			}
+			// 判断记录是否在指定时间段内
+			if (updatedAt.Equal(fromtime) || updatedAt.After(fromtime)) && updatedAt.Before(totime) {
+				netData = append(netData, netInfo)
+			}
+		}
+	}
+
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("处理内存信息记录时发生错误: %v", err)
+	}
+
+	// 将过滤后的数据插入 result
+	result["net"] = netData
+
+	return nil
+}
+func ReadProcessInfo(db *sql.DB, hostname string, from, to string, result map[string]interface{}) error {
+	// 查询 JSON 数据
+	rows, err := db.Query(`SELECT id, process_info FROM system_info WHERE hostname = $1`, hostname)
+	if err != nil {
+		return fmt.Errorf("查询内存信息时发生错误: %v", err)
+	}
+	defer rows.Close()
+
+	var processData []map[string]interface{}
+
+	// 遍历查询结果
+	for rows.Next() {
+		var id int
+		var processJSON []byte
+
+		// 读取查询结果
+		err := rows.Scan(&id, &processJSON)
+		if err != nil {
+			return fmt.Errorf("扫描内存信息记录时发生错误: %v", err)
+		}
+
+		// 解析 JSON 数据（假设 mem_info 是一个 JSON 数组）
+		var processInfos []map[string]interface{}
+		if err := json.Unmarshal(processJSON, &processInfos); err != nil {
+			return fmt.Errorf("解析 JSON 数据时发生错误: %v", err)
+		}
+
+		// 遍历 JSON 数组中的每个时间点数据
+		for _, processInfo := range processInfos {
+			// 获取 updated_at 字段
+			updatedAtStr, ok := processInfo["updated_at"].(string)
+			if !ok {
+				continue // 如果 updated_at 字段不存在或类型错误，跳过该记录
+			}
+
+			// 将 updated_at 字符串转换为 time.Time
+			updatedAt, err := time.Parse(time.RFC3339, updatedAtStr)
+			if err != nil {
+				return fmt.Errorf("解析 updated_at 字段时发生错误: %v", err)
+			}
+			fromtime, err := time.Parse(time.RFC3339, from)
+			if err != nil {
+				return fmt.Errorf("解析 from 字段时发生错误: %v", err)
+			}
+			totime, err := time.Parse(time.RFC3339, to)
+			if err != nil {
+				return fmt.Errorf("解析 to 字段时发生错误: %v", err)
+			}
+			// 判断记录是否在指定时间段内
+			if (updatedAt.Equal(fromtime) || updatedAt.After(fromtime)) && updatedAt.Before(totime) {
+				processData = append(processData, processInfo)
+			}
+		}
+	}
+
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("处理内存信息记录时发生错误: %v", err)
+	}
+
+	// 将过滤后的数据插入 result
+	result["process"] = processData
+
+	return nil
+}
+
+func ReadMemoryInfo(db *sql.DB, hostname string, from, to string, result map[string]interface{}) error {
+	// 查询 JSON 数据
+	rows, err := db.Query(`SELECT id, memory_info FROM system_info WHERE host_name = $1`, hostname)
+	if err != nil {
+		return fmt.Errorf("查询内存信息时发生错误: %v", err)
+	}
+	defer rows.Close()
+
+	var memoryData []map[string]interface{}
+
+	// 遍历查询结果
+	for rows.Next() {
+		var id int
+		var memInfoJSON []byte
+
+		// 读取查询结果
+		err := rows.Scan(&id, &memInfoJSON)
+		if err != nil {
+			return fmt.Errorf("扫描内存信息记录时发生错误: %v", err)
+		}
+		fmt.Println("ReadMemoryInfo memInfoJSON : ", memInfoJSON)
+
+		// 解析 JSON 数据（假设 mem_info 是一个 JSON 数组）
+		var memInfos []map[string]interface{}
+		if err := json.Unmarshal(memInfoJSON, &memInfos); err != nil {
+			return fmt.Errorf("解析 JSON 数据时发生错误: %v", err)
+		}
+
+		// 遍历 JSON 数组中的每个时间点数据
+		for _, memInfo := range memInfos {
+			// 获取 updated_at 字段
+			updatedAtStr, ok := memInfo["time"].(string)
+			if !ok {
+				continue // 如果 updated_at 字段不存在或类型错误，跳过该记录
+			}
+
+			// 将 updated_at 字符串转换为 time.Time
+			updatedAt, err := time.Parse(time.RFC3339, updatedAtStr)
+			if err != nil {
+				return fmt.Errorf("解析 updated_at 字段时发生错误: %v", err)
+			}
+			fromtime, err := time.Parse(time.RFC3339, from)
+			if err != nil {
+				return fmt.Errorf("解析 from 字段时发生错误: %v", err)
+			}
+			totime, err := time.Parse(time.RFC3339, to)
+			if err != nil {
+				return fmt.Errorf("解析 to 字段时发生错误: %v", err)
+			}
+			// 判断记录是否在指定时间段内
+			if (updatedAt.Equal(fromtime) || updatedAt.After(fromtime)) && updatedAt.Before(totime) {
+				memoryData = append(memoryData, memInfo)
+			}
+		}
+	}
+
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("处理内存信息记录时发生错误: %v", err)
+	}
+	fmt.Println(memoryData)
+
+	// 将过滤后的数据插入 result
+	result["memory"] = memoryData
+
+	return nil
+}
+func ReadCPUInfo(db *sql.DB, hostname string, from, to string, result map[string]interface{}) error {
+	// 查询 JSON 数据
+	rows, err := db.Query(`SELECT id, cpu_info FROM system_info WHERE host_name = $1`, hostname)
+	if err != nil {
+		return fmt.Errorf("查询cpu信息时发生错误: %v", err)
+	}
+	defer rows.Close()
+
+	var cpuData []map[string]interface{}
+
+	// 遍历查询结果
+	for rows.Next() {
+		var id int
+		var cpuJSON []byte
+
+		// 读取查询结果
+		err := rows.Scan(&id, &cpuJSON)
+		if err != nil {
+			return fmt.Errorf("扫描cpu信息记录时发生错误: %v", err)
+		}
+		fmt.Println("ReadCPUInfo cpuJSON : ", cpuJSON)
+
+		// 解析 JSON 数据（假设 mem_info 是一个 JSON 数组）
+		var cpuInfos []map[string]interface{}
+		if err := json.Unmarshal(cpuJSON, &cpuInfos); err != nil {
+			return fmt.Errorf("解析 JSON 数据时发生错误: %v", err)
+		}
+
+		// 遍历 JSON 数组中的每个时间点数据
+		for _, memInfo := range cpuInfos {
+			// 获取 updated_at 字段
+			updatedAtStr, ok := memInfo["time"].(string)
+			if !ok {
+				continue // 如果 updated_at 字段不存在或类型错误，跳过该记录
+			}
+
+			// 将 updated_at 字符串转换为 time.Time
+			updatedAt, err := time.Parse(time.RFC3339, updatedAtStr)
+			if err != nil {
+				return fmt.Errorf("解析 updated_at 字段时发生错误: %v", err)
+			}
+			fromtime, err := time.Parse(time.RFC3339, from)
+			if err != nil {
+				return fmt.Errorf("解析 from 字段时发生错误: %v", err)
+			}
+			totime, err := time.Parse(time.RFC3339, to)
+			if err != nil {
+				return fmt.Errorf("解析 to 字段时发生错误: %v", err)
+			}
+			// 判断记录是否在指定时间段内
+			if (updatedAt.Equal(fromtime) || updatedAt.After(fromtime)) && updatedAt.Before(totime) {
+				cpuData = append(cpuData, memInfo)
+			}
+		}
+	}
+
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("处理cpu信息记录时发生错误: %v", err)
+	}
+
+	// 将过滤后的数据插入 result
+	result["cpu"] = cpuData
+
+	return nil
+}
+func ReadNetInfo(db *sql.DB, hostname string, from, to string, result map[string]interface{}) error {
+	// 查询 JSON 数据
+	rows, err := db.Query(`SELECT id, network_info FROM system_info WHERE host_name = $1`, hostname)
+	if err != nil {
+		return fmt.Errorf("查询net信息时发生错误: %v", err)
+	}
+	defer rows.Close()
+
+	var netData []map[string]interface{}
+
+	// 遍历查询结果
+	for rows.Next() {
+		var id int
+		var netJSON []byte
+
+		// 读取查询结果
+		err := rows.Scan(&id, &netJSON)
+		if err != nil {
+			return fmt.Errorf("扫描net信息记录时发生错误: %v", err)
+		}
+		fmt.Println("ReadNetInfo netJSON : ", netJSON)
+
+		// 解析 JSON 数据（假设 mem_info 是一个 JSON 数组）
+		var netInfos []map[string]interface{}
+		if err := json.Unmarshal(netJSON, &netInfos); err != nil {
+			return fmt.Errorf("解析 JSON 数据时发生错误: %v", err)
+		}
+
+		// 遍历 JSON 数组中的每个时间点数据
+		for _, netInfo := range netInfos {
+			// 获取 updated_at 字段
+			updatedAtStr, ok := netInfo["time"].(string)
+			if !ok {
+				continue // 如果 updated_at 字段不存在或类型错误，跳过该记录
+			}
+
+			// 将 updated_at 字符串转换为 time.Time
+			updatedAt, err := time.Parse(time.RFC3339, updatedAtStr)
+			if err != nil {
+				return fmt.Errorf("解析 updated_at 字段时发生错误: %v", err)
+			}
+			fromtime, err := time.Parse(time.RFC3339, from)
+			if err != nil {
+				return fmt.Errorf("解析 from 字段时发生错误: %v", err)
+			}
+			totime, err := time.Parse(time.RFC3339, to)
+			if err != nil {
+				return fmt.Errorf("解析 to 字段时发生错误: %v", err)
+			}
+			// 判断记录是否在指定时间段内
+			if (updatedAt.Equal(fromtime) || updatedAt.After(fromtime)) && updatedAt.Before(totime) {
+				netData = append(netData, netInfo)
+			}
+		}
+	}
+
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("处理net信息记录时发生错误: %v", err)
+	}
+
+	// 将过滤后的数据插入 result
+	result["net"] = netData
+
+	return nil
+}
+func ReadProcessInfo(db *sql.DB, hostname string, from, to string, result map[string]interface{}) error {
+	// 查询 JSON 数据
+	rows, err := db.Query(`SELECT id, process_info FROM system_info WHERE host_name = $1`, hostname)
+	if err != nil {
+		return fmt.Errorf("查询进程信息时发生错误: %v", err)
+	}
+	defer rows.Close()
+
+	var processData []map[string]interface{}
+
+	// 遍历查询结果
+	for rows.Next() {
+		var id int
+		var processJSON []byte
+
+		// 读取查询结果
+		err := rows.Scan(&id, &processJSON)
+		if err != nil {
+			return fmt.Errorf("扫描进程信息记录时发生错误: %v", err)
+		}
+		fmt.Println("ReadProcessInfo processJSON : ", processJSON)
+
+		// 解析 JSON 数据（假设 mem_info 是一个 JSON 数组）
+		var processInfos []map[string]interface{}
+		if err := json.Unmarshal(processJSON, &processInfos); err != nil {
+			return fmt.Errorf("解析 JSON 数据时发生错误: %v", err)
+		}
+
+		// 遍历 JSON 数组中的每个时间点数据
+		for _, processInfo := range processInfos {
+			// 获取 updated_at 字段
+			updatedAtStr, ok := processInfo["time"].(string)
+			if !ok {
+				continue // 如果 updated_at 字段不存在或类型错误，跳过该记录
+			}
+
+			// 将 updated_at 字符串转换为 time.Time
+			updatedAt, err := time.Parse(time.RFC3339, updatedAtStr)
+			if err != nil {
+				return fmt.Errorf("解析 updated_at 字段时发生错误: %v", err)
+			}
+			fromtime, err := time.Parse(time.RFC3339, from)
+			if err != nil {
+				return fmt.Errorf("解析 from 字段时发生错误: %v", err)
+			}
+			totime, err := time.Parse(time.RFC3339, to)
+			if err != nil {
+				return fmt.Errorf("解析 to 字段时发生错误: %v", err)
+			}
+			// 判断记录是否在指定时间段内
+			if (updatedAt.Equal(fromtime) || updatedAt.After(fromtime)) && updatedAt.Before(totime) {
+				processData = append(processData, processInfo)
+			}
+		}
+	}
+
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("处理进程信息记录时发生错误: %v", err)
+	}
+
+	// 将过滤后的数据插入 result
+	result["process"] = processData
+
+	return nil
+}
 
 func ReadMemoryInfo(db *sql.DB, hostname string, from, to string, result map[string]interface{}) error {
 	// 查询 JSON 数据

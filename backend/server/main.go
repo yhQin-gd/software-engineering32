@@ -11,20 +11,23 @@ import (
 	"cmd/server/middlewire/cors"
 	db "cmd/server/model/init"
 	"fmt"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"log"
 	"os"
 
 	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func main() {
+	go monitor.CheckServerStatus() //读取DBConfig.yaml文件
 	go monitor.CheckServerStatus() //读取DBConfig.yaml文件
 	config, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("加载配置失败: %v", err)
 	}
+
+	fmt.Println("-----------------------")
 
 	fmt.Println("-----------------------")
 	//设置数据库连接的环境变量
@@ -79,6 +82,7 @@ func main() {
 	// 注册 Swagger 路由
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, ginSwagger.URL("/docs/swagger.json")))
 
+>>>>>>> fe9f630c60fdee46caca79950757ff2b94ca695d
 	router.POST("/agent/register", login.Register)
 	router.POST("/agent/login", login.Login)
 	// 需要 JWT 认证的路由
@@ -92,7 +96,9 @@ func main() {
 		// 监控
 		auth.POST("/install", install.InstallAgent)
 		auth.POST("/addSystemInfo", monitor.ReceiveAndStoreSystemMetrics)
+		auth.POST("/addSystemInfo", monitor.ReceiveAndStoreSystemMetrics)
 		auth.GET("/list", monitor.ListAgent)
+		router.GET("/monitor/:hostname", monitor.GetAgentInfo)
 		router.GET("/monitor/:hostname", monitor.GetAgentInfo)
 	}
 

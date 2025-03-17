@@ -42,7 +42,7 @@
                 </div>
                 <div class="info-item">
                     <span>已用：</span>
-                    <span>{{ memoryData.used }} ({{ memoryData.user_percent }}%)</span>
+                    <span>{{ memoryData.used }} ({{ memoryData.user_percent }})</span>
                 </div>
                 <div class="chart-placeholder">
                     <canvas id="memoryChart"></canvas>

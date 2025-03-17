@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log"
 	"os"
 	"strconv"
 
@@ -45,6 +46,8 @@ CREATE TABLE IF NOT EXISTS host_info (
 	id SERIAL PRIMARY KEY,
     user_name VARCHAR, -- REFERENCES users(name),
 	host_name VARCHAR(255)  UNIQUE,
+    user_name VARCHAR, -- REFERENCES users(name),
+	host_name VARCHAR(255)  UNIQUE,
 	os TEXT NOT NULL,
 	platform TEXT NOT NULL,
 	kernel_arch TEXT NOT NULL,
@@ -54,6 +57,8 @@ CREATE TABLE IF NOT EXISTS host_info (
 -- system_info表
 CREATE TABLE IF NOT EXISTS system_info (
 	id SERIAL PRIMARY KEY,
+	host_info_id INT, -- REFERENCES host_info(id),
+	host_name VARCHAR(255), -- REFERENCES host_info(host_name),
 	host_info_id INT, -- REFERENCES host_info(id),
 	host_name VARCHAR(255), -- REFERENCES host_info(host_name),
 	cpu_info JSONB,
@@ -67,12 +72,14 @@ CREATE TABLE IF NOT EXISTS system_info (
 CREATE TABLE IF NOT EXISTS hostandtoken (
 	id SERIAL PRIMARY KEY,
 	host_name VARCHAR(255) , -- REFERENCES host_info(host_name),
+	host_name VARCHAR(255) , -- REFERENCES host_info(host_name),
 	token TEXT NOT NULL,
 	last_heartbeat TIMESTAMP DEFAULT NOW(),
 	status VARCHAR(10) DEFAULT 'offline'
 );
 
 -- 在system_info表的host_info_id字段上创建索引，加速通过主机ID查找系统信息
+-- CREATE INDEX IF NOT EXISTS idx_system_info_host_info_id ON system_info(host_info_id);
 -- CREATE INDEX IF NOT EXISTS idx_system_info_host_info_id ON system_info(host_info_id);
 
 -- 对于system_info表中的JSONB字段(cpu_info, memory_info等)，如果需要根据某些键值进行查询，
@@ -448,6 +455,7 @@ func insertHostAndToken(tx *gorm.DB) error {
 // 	used NUMERIC(10,2) NOT NULL,
 // 	free NUMERIC(10,2) NOT NULL,
 // 	user_percent NUMERIC(5,2) NOT NULL,
+// 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 // 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 // );
 
