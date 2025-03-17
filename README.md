@@ -72,8 +72,8 @@ smtp_server:
 ```
 
 ## 其他说明
-1. **密码找回功能接口测试**
-<!-- 启动ngork服务，通过ngrok http 暴露本地8080端口，并在backend/server/config/configs中配置base_url；
+<!-- 1. **密码找回功能接口测试**
+启动ngork服务，通过ngrok http 暴露本地8080端口，并在backend/server/config/configs中配置base_url；
 访问登录localhost:8080/agent/login，获取token；然后在请求头中添加token，访问localhost:8080/agent/request_reset_password，参数为
 ```json
 {

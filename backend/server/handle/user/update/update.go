@@ -21,7 +21,7 @@ import (
 )
 
 // 修改用户名、密码、邮箱
-func UpdatePassword(c *gin.Context) {
+func UpdateUserInfo(c *gin.Context) {
 	// 从上下文中获取用户名
 	Username, exists := c.Get("username")
 	if !exists {

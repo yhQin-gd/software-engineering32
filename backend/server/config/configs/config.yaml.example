@@ -15,7 +15,8 @@ email:
   email_name: xxxx@163.com
   email_password: # 应用密码
   base_url: # ngrok http后提供的url
-  # 密码找回的方式二是发送验证码，可以不用暴露内网，不使用这个base_url
+  # 方式一是发送验证码，可以不用暴露内网，不使用这个base_url
+  # 方式二是发送链接，需要暴露内网，使用这个base_url
   # 使用ngrok暴露内网（测试环境）
   # ngrok http --url=你的静态域 8080
   # ngrok http http://localhost:8080

@@ -4,9 +4,9 @@ import (
 	"cmd/server/config"
 	"cmd/server/handle/agent/install"
 	"cmd/server/handle/server/monitor" // 引入 monitor 包
+	"cmd/server/handle/user/info"
 	"cmd/server/handle/user/login"
 	"cmd/server/handle/user/update"
-	"cmd/server/handle/user/info"
 	"cmd/server/middlewire"
 	"cmd/server/middlewire/cors"
 	db "cmd/server/model/init"
@@ -86,6 +86,7 @@ func main() {
 	{
 		// 用户信息
 		auth.GET("/info", info.GetUserInfo)
+		auth.POST("/update", update.UpdateUserInfo)
 		router.POST("/reset_password", update.ResetPassword)
 		auth.POST("/request_reset_password", update.RequestResetPassword)
 		// 监控
