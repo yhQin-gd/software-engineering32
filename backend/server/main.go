@@ -9,7 +9,6 @@ import (
 	"cmd/server/handle/user/update"
 	"cmd/server/middlewire"
 	"cmd/server/middlewire/cors"
-	"cmd/server/model"
 	db "cmd/server/model/init"
 	"fmt"
 	swaggerFiles "github.com/swaggo/files"
@@ -83,7 +82,6 @@ func main() {
 	// 注册 Swagger 路由
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, ginSwagger.URL("/docs/swagger.json")))
 
->>>>>>> fe9f630c60fdee46caca79950757ff2b94ca695d
 	router.POST("/agent/register", login.Register)
 	router.POST("/agent/login", login.Login)
 	// 需要 JWT 认证的路由
