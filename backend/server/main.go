@@ -9,6 +9,7 @@ import (
 	"cmd/server/handle/user/update"
 	"cmd/server/middlewire"
 	"cmd/server/middlewire/cors"
+	"cmd/server/model"
 	db "cmd/server/model/init"
 	"fmt"
 	swaggerFiles "github.com/swaggo/files"
