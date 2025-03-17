@@ -5,6 +5,8 @@ import (
 	"cmd/server/handle/agent/install"
 	"cmd/server/handle/server/monitor" // 引入 monitor 包
 	"cmd/server/handle/user/login"
+	"cmd/server/handle/user/update"
+	"cmd/server/handle/user/info"
 	"cmd/server/middlewire"
 	"cmd/server/middlewire/cors"
 	db "cmd/server/model/init"
@@ -82,8 +84,11 @@ func main() {
 	// 需要 JWT 认证的路由
 	auth := router.Group("/agent", middlewire.JWTAuthMiddleware())
 	{
-		router.POST("/reset_password", login.ResetPassword)
-		auth.POST("/request_reset_password", login.RequestResetPassword)
+		// 用户信息
+		auth.GET("/info", info.GetUserInfo)
+		router.POST("/reset_password", update.ResetPassword)
+		auth.POST("/request_reset_password", update.RequestResetPassword)
+		// 监控
 		auth.POST("/install", install.InstallAgent)
 		auth.POST("/addSystemInfo", monitor.ReceiveAndStoreSystemMetrics)
 		auth.GET("/list", monitor.ListAgent)
