@@ -10,13 +10,17 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"time"
+	"os/signal"
 
 	//"regexp"
 	"strings"
 
 	"github.com/go-redis/redis/v8"
+	_ "github.com/taosdata/driver-go/v3/taosSql"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"database/sql"
 )
 
 // 属性均用驼峰命名转换后的含_的，表名就不含_。
@@ -43,9 +47,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- host表
 CREATE TABLE IF NOT EXISTS host_info (
 	id SERIAL PRIMARY KEY,
-    user_name VARCHAR, -- REFERENCES users(name),
-	host_name VARCHAR(255)  UNIQUE,
-    user_name VARCHAR, -- REFERENCES users(name),
+    user_name VARCHAR REFERENCES users(name),
 	host_name VARCHAR(255)  UNIQUE,
 	os TEXT NOT NULL,
 	platform TEXT NOT NULL,
@@ -53,38 +55,14 @@ CREATE TABLE IF NOT EXISTS host_info (
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP -- TIMESTAMP WITH TIME ZONE 加上时区
 );
 
--- system_info表
-CREATE TABLE IF NOT EXISTS system_info (
-	id SERIAL PRIMARY KEY,
-	host_info_id INT, -- REFERENCES host_info(id),
-	host_name VARCHAR(255), -- REFERENCES host_info(host_name),
-	host_info_id INT, -- REFERENCES host_info(id),
-	host_name VARCHAR(255), -- REFERENCES host_info(host_name),
-	cpu_info JSONB,
-	memory_info JSONB,
-	process_info JSONB,
-	network_info JSONB,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
 -- token表
 CREATE TABLE IF NOT EXISTS hostandtoken (
 	id SERIAL PRIMARY KEY,
-	host_name VARCHAR(255) , -- REFERENCES host_info(host_name),
-	host_name VARCHAR(255) , -- REFERENCES host_info(host_name),
+	host_name VARCHAR(255) REFERENCES host_info(host_name),
 	token TEXT NOT NULL,
 	last_heartbeat TIMESTAMP DEFAULT NOW(),
 	status VARCHAR(10) DEFAULT 'offline'
 );
-
--- 在system_info表的host_info_id字段上创建索引，加速通过主机ID查找系统信息
--- CREATE INDEX IF NOT EXISTS idx_system_info_host_info_id ON system_info(host_info_id);
--- CREATE INDEX IF NOT EXISTS idx_system_info_host_info_id ON system_info(host_info_id);
-
--- 对于system_info表中的JSONB字段(cpu_info, memory_info等)，如果需要根据某些键值进行查询，
--- 可以考虑创建GIN (Generalized Inverted Index) 索引，例如：
--- 假设经常需要基于cpu_info内的某个键（如percent）来查询
-CREATE INDEX IF NOT EXISTS idx_system_info_cpu_percent ON system_info USING GIN ((cpu_info->'percent') jsonb_path_ops);
 
 -- 在hostandtoken表的host_name字段上创建索引，加速主机名查找
 CREATE INDEX IF NOT EXISTS idx_hostandtoken_host_name ON hostandtoken(host_name);
@@ -115,7 +93,23 @@ CREATE INDEX IF NOT EXISTS idx_hostandtoken_last_heartbeat ON hostandtoken(last_
 //   ……
 // ]
 
+// 创建system的超级表
+const systemSuperTable = `
+CREATE STABLE if not exists system_info (
+	created_at TIMESTAMP,
+    host_name VARCHAR(255),
+	host_info VARCHAR(4096),
+    cpu_info VARCHAR(4096),
+    memory_info VARCHAR(4096),
+    process_info VARCHAR(4096),
+    network_info VARCHAR(4096)
+) TAGS (
+    tags_host_name VARCHAR(255)
+);
+`
+
 var DB *gorm.DB
+var TDengineDB *sql.DB
 
 var CTX = context.Background()
 var RDB *redis.Client
@@ -170,8 +164,29 @@ func ConnectDatabase() error {
 	return nil
 }
 
+//连接TDengine数据库
+func ConnectTDengine() error {
+	var err error
+
+	// 获取数据库连接信息
+	user := os.Getenv("TDENGINE_USER")
+	password := os.Getenv("TDENGINE_PASSWORD")
+	dbname := os.Getenv("TDENGINE_NAME")
+	host := os.Getenv("TDENGINE_HOST")
+	port := os.Getenv("TDENGINE_PORT")
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", user, password, host, port, dbname)
+
+	//打开数据库
+	TDengineDB, err = sql.Open("taosSql", dsn)
+	if err != nil {
+		log.Fatalf("Failed to open connection: %v", err)
+	}
+	return nil
+}
+
 // InitDB 初始化数据库，创建所需的表
 func InitDB() error {
+	//初始化postgresql数据库
 	if DB == nil {
 		return fmt.Errorf("database connection is not initialized") // 检查数据库连接是否已初始化
 	}
@@ -187,9 +202,19 @@ func InitDB() error {
 	}
 
 	if err := tx.Commit().Error; err != nil {
-		return err // 返回提交事务时的错误
+		//return err // 返回提交事务时的错误
 	}
 
+	//初始化TDengine数据库
+	if TDengineDB == nil {
+		return fmt.Errorf("TDengine database connection is not initialized") // 检查数据库连接是否已初始化
+	}
+
+	// 创建超级表
+	if _, err := TDengineDB.Exec(systemSuperTable); err != nil {
+		return err
+	}
+	
 	return nil
 }
 
@@ -249,17 +274,37 @@ func InitDBData() error {
 	}
 	fmt.Println("3---------------")
 
-	// 插入 system_info 数据
+	/* // 插入 system_info 数据
 	if err := insertSystemInfo(tx); err != nil {
 		tx.Rollback() // 回滚事务
 		return err    // 返回插入系统信息时的错误
 	}
-	fmt.Println("4---------------")
+	fmt.Println("4---------------") */
 
 	// 插入 hostandtoken 数据
 	if err := insertHostAndToken(tx); err != nil {
 		tx.Rollback() // 回滚事务
 		return err    // 返回插入 token 信息时的错误
+	}
+	fmt.Println("4---------------")
+
+	// 设置信号处理
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt, os.Kill)
+	go func() {
+		<-signals
+		fmt.Println("Received signal, closing database connection...")
+		TDengineDB.Close()
+		os.Exit(1)
+	}()
+
+	if TDengineDB == nil {
+		return fmt.Errorf("TDengine database connection is not initialized")
+	}
+	//插入system_info子表数据
+	if err := insertSystemInfo(TDengineDB); err != nil {
+		tx.Rollback()
+		return err
 	}
 	fmt.Println("5---------------")
 
@@ -355,7 +400,7 @@ func insertHostInfo(tx *gorm.DB) error {
 }
 
 // insertSystemInfo 函数从 system_info.txt 文件中读取系统信息
-func insertSystemInfo(tx *gorm.DB) error {
+func insertSystemInfo(t *sql.DB) error {
 	file, err := os.Open("asset/example/system_info.txt")
 	if err != nil {
 		return fmt.Errorf("failed to open system_info file: %w", err)
@@ -372,6 +417,12 @@ func insertSystemInfo(tx *gorm.DB) error {
 		}
 		// fmt.Println("Read line:", line) // 输出读取的行（调试用）
 
+		// 检查是否以空格开头
+		if strings.HasPrefix(line, " ") {
+			fmt.Println("Encountered a comment line, skipping.")
+			break
+		}
+
 		parts := strings.Split(line, ",,")
 		// fmt.Println()
 		// fmt.Println("len:",len(parts))
@@ -380,31 +431,79 @@ func insertSystemInfo(tx *gorm.DB) error {
 			return fmt.Errorf("invalid line format: %s", line)
 		}
 		hostName := parts[0]
-		hostInfoID := parts[1]
+		hostInfo := parts[1]
 		cpuInfo := parts[2]
 		memoryInfo := parts[3]
 		processInfo := parts[4]
 		networkInfo := parts[5]
-		// fmt.Println("hostName:", hostName)
-		// fmt.Println("hostInfoID:", hostInfoID)
-		// fmt.Println("cpuInfo:", cpuInfo)
-		// fmt.Println("memoryInfo:", memoryInfo)
-		// fmt.Println("processInfo:", processInfo)
-		// fmt.Println("networkInfo:", networkInfo)
+		//fmt.Println("hostName:", hostName)
+		//fmt.Println("hostInfo:", hostInfo)
+		//fmt.Println("cpuInfo:", cpuInfo)
+		//fmt.Println("memoryInfo:", memoryInfo)
+		//fmt.Println("processInfo:", processInfo)
+		//fmt.Println("networkInfo:", networkInfo)
 
 		// 验证每个 JSON 字符串的有效性
-		if !isValidJSON(cpuInfo) || !isValidJSON(memoryInfo) || !isValidJSON(processInfo) || !isValidJSON(networkInfo) {
+		if !isValidJSON(hostInfo)||!isValidJSON(cpuInfo) || !isValidJSON(memoryInfo) || !isValidJSON(processInfo) || !isValidJSON(networkInfo) {
 			return fmt.Errorf("invalid JSON data for host %s", hostName)
 		}
 
-		// 插入数据库（注意：这里假设数据库表 system_info 的对应字段已经设置为接受 jsonb 类型）
+		/* // 插入数据库（注意：这里假设数据库表 system_info 的对应字段已经设置为接受 jsonb 类型）
 		if err := tx.Exec(
 			"INSERT INTO system_info (host_name, host_info_id, cpu_info, memory_info, process_info, network_info) VALUES (?, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?::jsonb)",
 			hostName, hostInfoID, cpuInfo, memoryInfo, processInfo, networkInfo,
 		).Error; err != nil {
 			return fmt.Errorf("failed to insert system info for host %s: %w", hostName, err)
+		} */
+
+		// 拼接子表名
+		tableName := fmt.Sprintf("%s_systemInfo", hostName)
+
+		createTableQuery := fmt.Sprintf(`
+			CREATE TABLE IF NOT EXISTS %s USING system_info TAGS('%s')
+		`, tableName, hostName)
+
+		_, err := t.Exec(createTableQuery)
+		if err != nil {
+			log.Printf("Error creating table %s: %v\n", tableName, err)
+			return err
+		}
+
+		currentTime := time.Now().Format("2006-01-02 15:04:05") // 格式化时间为TDengine接受的格式
+
+		hostInfoJSON, err := json.Marshal(hostInfo)
+		if err != nil {
+			return fmt.Errorf("failed to marshal hostInfo: %w", err)
+		}
+		cpuInfoJSON, err := json.Marshal(cpuInfo)
+		if err != nil {
+			return fmt.Errorf("failed to marshal cpuInfo: %w", err)
+		}
+		memoryInfoJSON, err := json.Marshal(memoryInfo)
+		if err != nil {
+			return fmt.Errorf("failed to marshal memoryInfo: %w", err)
+		}
+		processInfoJSON, err := json.Marshal(processInfo)
+		if err != nil {
+			return fmt.Errorf("failed to marshal processInfo: %w", err)
+		}
+		networkInfoJSON, err := json.Marshal(networkInfo)
+		if err != nil {
+			return fmt.Errorf("failed to marshal networkInfo: %w", err)
+		}
+
+		insertDataQuery := fmt.Sprintf(`
+			INSERT INTO %s (created_at, host_name, host_info, cpu_info, memory_info, process_info, network_info) 
+			VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s')
+		`, tableName, currentTime, hostName, string(hostInfoJSON), string(cpuInfoJSON), string(memoryInfoJSON), string(processInfoJSON), string(networkInfoJSON))
+
+		_, err = t.Exec(insertDataQuery)
+		if err != nil {
+			log.Printf("Error inserting data into table %s: %v\n", tableName, err)
+			return err
 		}
 	}
+
 	return scanner.Err() // 返回读取文件的错误（如果有）
 }
 
@@ -454,7 +553,6 @@ func insertHostAndToken(tx *gorm.DB) error {
 // 	used NUMERIC(10,2) NOT NULL,
 // 	free NUMERIC(10,2) NOT NULL,
 // 	user_percent NUMERIC(5,2) NOT NULL,
-// 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 // 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 // );
 

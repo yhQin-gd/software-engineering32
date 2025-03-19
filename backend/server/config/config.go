@@ -9,8 +9,17 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// DBConfig 用于保存数据库配置
+// DBConfig 用于保存PostgreSQL数据库配置
 type DBConfig struct {
+	Host     string `yaml:"host"`
+	Port     string `yaml:"port"`
+	Name     string `yaml:"name"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
+}
+
+//TDengineConfig 用于保存TDengine数据库配置
+type TDengineConfig struct {
 	Host     string `yaml:"host"`
 	Port     string `yaml:"port"`
 	Name     string `yaml:"name"`
@@ -44,6 +53,7 @@ type SMTPServerConfig struct {
 // Config 用于保存所有配置项
 type Config struct {
 	DB         DBConfig         `yaml:"db"`
+	TDengine   TDengineConfig   `yaml:"tdengine"`
 	OSS        OSSConfig        `yaml:"oss"`
 	Redis      RedisConfig      `yaml:"redis"`
 	Email      EMAILConfig      `yaml:"email"`

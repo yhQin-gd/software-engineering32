@@ -30,12 +30,18 @@ func main() {
 	fmt.Println("-----------------------")
 
 	fmt.Println("-----------------------")
-	//设置数据库连接的环境变量
+	//设置PostgreSQL数据库连接的环境变量
 	os.Setenv("DB_USER", config.DB.User)
 	os.Setenv("DB_PASSWORD", config.DB.Password)
 	os.Setenv("DB_HOST", config.DB.Host)
 	os.Setenv("DB_PORT", config.DB.Port)
 	os.Setenv("DB_NAME", config.DB.Name)
+	//设置TDengine数据库连接的环境变量
+	os.Setenv("TDENGINE_USER", config.TDengine.User)
+	os.Setenv("TDENGINE_PASSWORD", config.TDengine.Password)
+	os.Setenv("TDENGINE_HOST", config.TDengine.Host)
+	os.Setenv("TDENGINE_PORT", config.TDengine.Port)
+	os.Setenv("TDENGINE_NAME", config.TDengine.Name)
 	// OSS服务
 	os.Setenv("OSS_REGION", config.OSS.OSS_REGION)
 	os.Setenv("OSS_ACCESS_KEY_ID", config.OSS.OSS_ACCESS_KEY_ID)
@@ -60,9 +66,13 @@ func main() {
 
 	router := gin.Default()
 	router.Use(cors.CORSMiddleware())
-	// 连接数据库
+	// 连接PostgreSQL数据库
 	if err := db.ConnectDatabase(); err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
+	}
+	//连接TDengine数据库
+	if err := db.ConnectTDengine(); err != nil {
+		log.Fatalf("Failed to connect to TDengine database: %v", err)
 	}
 	// 初始化数据库
 	if err := db.InitDB(); err != nil {
@@ -95,9 +105,7 @@ func main() {
 		// 监控
 		auth.POST("/install", install.InstallAgent)
 		auth.POST("/addSystemInfo", monitor.ReceiveAndStoreSystemMetrics)
-		auth.POST("/addSystemInfo", monitor.ReceiveAndStoreSystemMetrics)
 		auth.GET("/list", monitor.ListAgent)
-		router.GET("/monitor/:hostname", monitor.GetAgentInfo)
 		router.GET("/monitor/:hostname", monitor.GetAgentInfo)
 	}
 
